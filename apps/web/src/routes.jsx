@@ -1,0 +1,59 @@
+import { createBrowserRouter, Navigate } from 'react-router-dom';
+import AppShell from './components/layout/AppShell.jsx';
+import Login from './pages/Login.jsx';
+import Dashboard from './pages/Dashboard.jsx';
+import Vouchers from './pages/Vouchers.jsx';
+import VoucherCreate from './pages/VoucherCreate.jsx';
+import Inventory from './pages/Inventory.jsx';
+import Parties from './pages/Parties.jsx';
+import Accounting from './pages/Accounting.jsx';
+import { useAuthStore } from './store/authStore.js';
+
+function ProtectedRoute({ children }) {
+  const accessToken = useAuthStore((s) => s.accessToken);
+  if (!accessToken) return <Navigate to="/login" replace />;
+  return children;
+}
+
+function PublicRoute({ children }) {
+  const accessToken = useAuthStore((s) => s.accessToken);
+  if (accessToken) return <Navigate to="/" replace />;
+  return children;
+}
+
+function Placeholder({ title }) {
+  return (
+    <div>
+      <h1 style={{ fontSize: '1.5rem', fontWeight: 700 }}>{title}</h1>
+      <p style={{ color: '#64748b', marginTop: 8 }}>Coming soon</p>
+    </div>
+  );
+}
+
+export const router = createBrowserRouter([
+  {
+    path: '/login',
+    element: (
+      <PublicRoute>
+        <Login />
+      </PublicRoute>
+    ),
+  },
+  {
+    path: '/',
+    element: (
+      <ProtectedRoute>
+        <AppShell />
+      </ProtectedRoute>
+    ),
+    children: [
+      { index: true, element: <Dashboard /> },
+      { path: 'vouchers', element: <Vouchers /> },
+      { path: 'vouchers/new', element: <VoucherCreate /> },
+      { path: 'inventory', element: <Inventory /> },
+      { path: 'parties', element: <Parties /> },
+      { path: 'accounting', element: <Accounting /> },
+      { path: 'settings', element: <Placeholder title="Settings" /> },
+    ],
+  },
+]);
