@@ -1,5 +1,6 @@
 import Item from './item.model.js';
 import ItemGroup from './itemGroup.model.js';
+import BillOfMaterial from '../bom/bom.model.js';
 import ApiError from '../../utils/ApiError.js';
 
 // ─── ItemGroup ───
@@ -81,5 +82,16 @@ export async function updateItem(id, data, businessId, userId) {
 export async function deleteItem(id, businessId, userId) {
   const item = await Item.findOne({ _id: id, businessId });
   if (!item) throw ApiError.notFound('Item not found');
+
+  // Block deletion if item is used in any active BOM
+  const bomCount = await BillOfMaterial.countDocuments({
+    businessId,
+    $or: [{ outputItemId: id }, { 'inputs.itemId': id }],
+    isDeleted: false,
+  });
+  if (bomCount > 0) {
+    throw ApiError.badRequest('Cannot delete item that is used in a Bill of Materials');
+  }
+
   return item.softDelete(userId);
 }

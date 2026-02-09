@@ -87,6 +87,12 @@ export const COSTING_METHODS = {
   FIFO: 'fifo',
 };
 
+export const BOM_STATUS = {
+  DRAFT: 'draft',
+  ACTIVE: 'active',
+  ARCHIVED: 'archived',
+};
+
 export function getFinancialYear(date = new Date()) {
   const month = date.getMonth(); // 0-indexed
   const year = date.getFullYear();

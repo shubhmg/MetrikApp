@@ -86,6 +86,11 @@ export default function VoucherCreate() {
   const [accountLines, setAccountLines] = useState([{ ...EMPTY_ACCOUNT_LINE }]);
   const [saving, setSaving] = useState(false);
 
+  // BOM state for production vouchers
+  const [activeBom, setActiveBom] = useState(null);
+  const [selectedBomId, setSelectedBomId] = useState(null);
+  const [bomLoading, setBomLoading] = useState(false);
+
   // Reference data
   const [parties, setParties] = useState([]);
   const [items, setItems] = useState([]);
@@ -122,10 +127,53 @@ export default function VoucherCreate() {
   // Simple mode for Receipt/Payment with Party selected
   const isSimpleMode = (voucherType === 'receipt' || voucherType === 'payment') && partyId;
 
+  const isProduction = voucherType === 'production';
+
   const partyData = useMemo(() => parties.map((p) => ({ value: p._id, label: p.name })), [parties]);
   const itemData = useMemo(() => items.map((i) => ({ value: i._id, label: `${i.sku} - ${i.name}` })), [items]);
   const accountData = useMemo(() => accounts.map((a) => ({ value: a._id, label: `${a.code || ''} ${a.name}`.trim() })), [accounts]);
   const mcData = useMemo(() => mcs.map((m) => ({ value: m._id, label: `${m.code} - ${m.name}` })), [mcs]);
+
+  // Fetch active BOM when output item changes for production vouchers
+  async function fetchBomForItem(outputItemId) {
+    if (!outputItemId) {
+      setActiveBom(null);
+      setSelectedBomId(null);
+      return;
+    }
+    setBomLoading(true);
+    try {
+      const res = await api.get(`/boms/item/${outputItemId}/active`);
+      const bom = res.data.data.bom;
+      setActiveBom(bom);
+      setSelectedBomId(bom?._id || null);
+    } catch {
+      setActiveBom(null);
+      setSelectedBomId(null);
+    }
+    setBomLoading(false);
+  }
+
+  // Expand BOM inputs when BOM selected + output quantity set
+  async function expandBomInputs(bomId, outputQuantity) {
+    if (!bomId || !outputQuantity || outputQuantity <= 0) return;
+    try {
+      const res = await api.get(`/boms/expand?bomId=${bomId}&outputQuantity=${outputQuantity}`);
+      const expandedInputs = res.data.data.inputs;
+      // Keep first line (output), replace rest with expanded inputs
+      setItemLines((prev) => {
+        const outputLine = prev[0] || { ...EMPTY_ITEM_LINE };
+        const inputLines = expandedInputs.map((inp) => ({
+          itemId: inp.itemId?._id || inp.itemId,
+          quantity: inp.quantity,
+          rate: 0,
+          discount: 0,
+          gstRate: 0,
+        }));
+        return [outputLine, ...inputLines];
+      });
+    } catch { /* ignore */ }
+  }
 
   // Item line helpers
   function updateItemLine(idx, field, value) {
@@ -139,6 +187,15 @@ export default function VoucherCreate() {
       }
       return next;
     });
+
+    // For production: when output item (idx 0) changes, fetch BOM
+    if (isProduction && idx === 0 && field === 'itemId') {
+      fetchBomForItem(value);
+    }
+    // For production: when output quantity (idx 0) changes and BOM selected, expand
+    if (isProduction && idx === 0 && field === 'quantity' && selectedBomId && value > 0) {
+      expandBomInputs(selectedBomId, value);
+    }
   }
   function addItemLine() { setItemLines((prev) => [...prev, { ...EMPTY_ITEM_LINE }]); }
   function removeItemLine(idx) { setItemLines((prev) => prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev); }
@@ -192,6 +249,7 @@ export default function VoucherCreate() {
 
       if (needsParty && partyId) payload.partyId = partyId;
       if (needsMc && materialCentreId) payload.materialCentreId = materialCentreId;
+      if (isProduction && selectedBomId) payload.bomId = selectedBomId;
       if (isTransfer) {
         payload.fromMaterialCentreId = fromMaterialCentreId;
         payload.toMaterialCentreId = toMaterialCentreId;
@@ -301,6 +359,16 @@ export default function VoucherCreate() {
             </>
           )}
         </SimpleGrid>
+
+        {/* BOM indicator for production vouchers */}
+        {isProduction && activeBom && (
+          <Alert variant="light" color="blue" title={`BOM: ${activeBom.name} (v${activeBom.version})`}>
+            Active BOM found. Set output quantity to auto-expand input items.
+          </Alert>
+        )}
+        {isProduction && bomLoading && (
+          <Alert variant="light" color="gray">Checking for active BOM...</Alert>
+        )}
 
         {/* Item-based line items */}
         {isItemBased && voucherType && (

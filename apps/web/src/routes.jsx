@@ -9,6 +9,7 @@ import Items from './pages/Items.jsx';
 import Parties from './pages/Parties.jsx';
 import Accounting from './pages/Accounting.jsx';
 import SalesInvoices from './pages/SalesInvoices.jsx';
+import Boms from './pages/Boms.jsx';
 import Receipts from './pages/Receipts.jsx';
 import { useAuthStore } from './store/authStore.js';
 
@@ -52,6 +53,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <Dashboard /> },
       { path: 'items', element: <Items /> },
+      { path: 'boms', element: <Boms /> },
       { path: 'sales-invoices', element: <SalesInvoices /> },
       { path: 'receipts', element: <Receipts /> },
       { path: 'vouchers', element: <Vouchers /> },

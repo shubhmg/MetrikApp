@@ -28,8 +28,14 @@ import ApiError from '../../../utils/ApiError.js';
 
 export function validate(data) {
   if (!data.materialCentreId) throw ApiError.badRequest('Material centre is required for production');
-  if (!data.lineItems || data.lineItems.length < 2) {
-    throw ApiError.badRequest('Production requires at least 1 output and 1 input line item');
+
+  const minItems = data.bomId ? 1 : 2;
+  if (!data.lineItems || data.lineItems.length < minItems) {
+    throw ApiError.badRequest(
+      data.bomId
+        ? 'Production requires at least 1 output and 1 input line item'
+        : 'Production requires at least 1 output and 1 input line item'
+    );
   }
 
   // First line is output, rest are inputs

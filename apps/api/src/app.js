@@ -12,6 +12,7 @@ import itemRoutes from './modules/item/item.routes.js';
 import mcRoutes from './modules/material-centre/materialCentre.routes.js';
 import partyRoutes from './modules/party/party.routes.js';
 import voucherRoutes from './modules/voucher/voucher.routes.js';
+import bomRoutes from './modules/bom/bom.routes.js';
 
 // Initialize event handlers (side-effect import)
 import './events/handlers/auditHandler.js';
@@ -43,6 +44,7 @@ app.use('/api/items', auth, tenantContext, itemRoutes);
 app.use('/api/material-centres', auth, tenantContext, mcRoutes);
 app.use('/api/parties', auth, tenantContext, partyRoutes);
 app.use('/api/vouchers', auth, tenantContext, voucherRoutes);
+app.use('/api/boms', auth, tenantContext, bomRoutes);
 
 // 404
 app.use((_req, res) => {
