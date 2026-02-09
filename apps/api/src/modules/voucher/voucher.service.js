@@ -28,6 +28,8 @@ export async function listVouchers(businessId, filters = {}) {
     Voucher.find(query)
       .populate('partyId', 'name')
       .populate('materialCentreId', 'name code')
+      .populate('lineItems.itemId', 'name sku unit')
+      .populate('bomId', 'name version')
       .sort({ date: -1, createdAt: -1 })
       .skip(skip)
       .limit(limit),
@@ -44,6 +46,7 @@ export async function getVoucherById(id, businessId) {
     .populate('lineItems.itemId', 'name sku unit')
     .populate('lineItems.accountId', 'name code')
     .populate('lineItems.materialCentreId', 'name code')
+    .populate('bomId', 'name version')
     .populate('postedBy', 'name')
     .populate('cancelledBy', 'name');
 

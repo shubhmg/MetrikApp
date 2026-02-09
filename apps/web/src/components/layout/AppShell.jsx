@@ -18,6 +18,7 @@ import {
   IconSettings,
   IconBox,
   IconAssembly,
+  IconTool,
 } from '@tabler/icons-react';
 import { useAuth } from '../../hooks/useAuth.js';
 
@@ -25,6 +26,7 @@ const NAV_ITEMS = [
   { path: '/', label: 'Dashboard', icon: IconLayoutDashboard },
   { path: '/items', label: 'Items', icon: IconBox },
   { path: '/boms', label: 'Bill of Materials', icon: IconAssembly },
+  { path: '/productions', label: 'Productions', icon: IconTool },
   { path: '/sales-invoices', label: 'Sales Invoices', icon: IconFileInvoice },
   { path: '/receipts', label: 'Receipts', icon: IconReportMoney },
   { path: '/vouchers', label: 'All Vouchers', icon: IconFileInvoice },

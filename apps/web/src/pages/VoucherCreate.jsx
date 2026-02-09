@@ -198,7 +198,10 @@ export default function VoucherCreate() {
     }
   }
   function addItemLine() { setItemLines((prev) => [...prev, { ...EMPTY_ITEM_LINE }]); }
-  function removeItemLine(idx) { setItemLines((prev) => prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev); }
+  function removeItemLine(idx) {
+    if (isProduction && idx === 0) return; // Can't delete the output line
+    setItemLines((prev) => prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev);
+  }
 
   // Account line helpers
   function updateAccountLine(idx, field, value) {
@@ -299,7 +302,7 @@ export default function VoucherCreate() {
     <div>
       <Group mb="lg">
         <ActionIcon variant="subtle" onClick={() => navigate(-1)}><IconArrowLeft size={20} /></ActionIcon>
-        <Title order={2}>New Voucher</Title>
+        <Title order={2}>{isProduction ? 'New Production' : 'New Voucher'}</Title>
       </Group>
 
       <Stack>
@@ -370,8 +373,122 @@ export default function VoucherCreate() {
           <Alert variant="light" color="gray">Checking for active BOM...</Alert>
         )}
 
-        {/* Item-based line items */}
-        {isItemBased && voucherType && (
+        {/* Production-specific form */}
+        {isProduction && voucherType && (() => {
+          const inputLines = itemLines.slice(1);
+          const totalInputCost = inputLines.reduce((sum, l) => sum + (l.quantity * l.rate), 0);
+          const outputQty = itemLines[0]?.quantity || 0;
+          const outputCostPerUnit = outputQty > 0 ? totalInputCost / outputQty : 0;
+          return (
+            <Stack>
+              {/* Output Section */}
+              <Card withBorder style={{ borderColor: 'var(--mantine-color-green-5)', borderWidth: 2 }}>
+                <Text fw={600} c="green" mb="sm">Output (Produced Item)</Text>
+                <SimpleGrid cols={{ base: 1, sm: 3 }}>
+                  <Select
+                    label="Item"
+                    data={itemData}
+                    value={itemLines[0]?.itemId || null}
+                    onChange={(v) => updateItemLine(0, 'itemId', v)}
+                    searchable
+                    placeholder="Select output item..."
+                  />
+                  <NumberInput
+                    label="Quantity"
+                    min={1}
+                    value={itemLines[0]?.quantity || 1}
+                    onChange={(v) => updateItemLine(0, 'quantity', v || 0)}
+                  />
+                  <TextInput
+                    label="Rate (auto-calculated)"
+                    value={outputCostPerUnit.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    readOnly
+                    variant="filled"
+                  />
+                </SimpleGrid>
+              </Card>
+
+              {/* Inputs Section */}
+              <Card withBorder style={{ borderColor: 'var(--mantine-color-orange-5)', borderWidth: 2 }}>
+                <Group justify="space-between" mb="sm">
+                  <Text fw={600} c="orange">Inputs (Raw Materials Consumed)</Text>
+                  <Button size="xs" variant="light" color="orange" leftSection={<IconPlus size={14} />} onClick={addItemLine}>Add Input</Button>
+                </Group>
+                <Table withTableBorder>
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th style={{ minWidth: 200 }}>Item</Table.Th>
+                      <Table.Th style={{ width: 100 }}>Qty</Table.Th>
+                      <Table.Th style={{ width: 120 }}>Rate</Table.Th>
+                      <Table.Th style={{ width: 120, textAlign: 'right' }}>Amount</Table.Th>
+                      <Table.Th style={{ width: 40 }}></Table.Th>
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {inputLines.length === 0 ? (
+                      <Table.Tr>
+                        <Table.Td colSpan={5}>
+                          <Text size="sm" c="dimmed" ta="center" py="sm">No input items. Add rows or select an output item with an active BOM.</Text>
+                        </Table.Td>
+                      </Table.Tr>
+                    ) : (
+                      inputLines.map((line, i) => {
+                        const realIdx = i + 1; // offset by 1 since index 0 is output
+                        const lineAmount = line.quantity * line.rate;
+                        return (
+                          <Table.Tr key={realIdx}>
+                            <Table.Td>
+                              <Select
+                                data={itemData}
+                                value={line.itemId || null}
+                                onChange={(v) => updateItemLine(realIdx, 'itemId', v)}
+                                searchable
+                                size="xs"
+                                placeholder="Select item..."
+                              />
+                            </Table.Td>
+                            <Table.Td>
+                              <NumberInput size="xs" min={0} value={line.quantity} onChange={(v) => updateItemLine(realIdx, 'quantity', v || 0)} />
+                            </Table.Td>
+                            <Table.Td>
+                              <NumberInput size="xs" min={0} value={line.rate} onChange={(v) => updateItemLine(realIdx, 'rate', v || 0)} />
+                            </Table.Td>
+                            <Table.Td style={{ textAlign: 'right' }}>
+                              <Text size="sm" fw={500}>{lineAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
+                            </Table.Td>
+                            <Table.Td>
+                              <ActionIcon variant="subtle" color="red" size="sm" onClick={() => removeItemLine(realIdx)}>
+                                <IconTrash size={14} />
+                              </ActionIcon>
+                            </Table.Td>
+                          </Table.Tr>
+                        );
+                      })
+                    )}
+                  </Table.Tbody>
+                </Table>
+
+                {/* Cost Summary */}
+                <SimpleGrid cols={2} mt="sm">
+                  <div />
+                  <Stack gap={4}>
+                    <Group justify="space-between">
+                      <Text size="sm">Total Input Cost:</Text>
+                      <Text size="sm" fw={600}>{totalInputCost.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
+                    </Group>
+                    <Group justify="space-between">
+                      <Text size="sm">Output Cost / Unit:</Text>
+                      <Text size="sm" fw={700} c="green">{outputCostPerUnit.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
+                    </Group>
+                  </Stack>
+                </SimpleGrid>
+              </Card>
+            </Stack>
+          );
+        })()}
+
+        {/* Item-based line items (non-production) */}
+        {isItemBased && !isProduction && voucherType && (
           <Card withBorder>
             <Group justify="space-between" mb="sm">
               <Text fw={600}>Line Items</Text>
