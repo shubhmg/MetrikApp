@@ -48,6 +48,8 @@ export default function VoucherDetailModal({ voucher, onClose, onUpdate }) {
 
   if (!voucher) return null;
 
+  const isAccountBased = ['payment', 'receipt', 'journal', 'contra'].includes(voucher.voucherType);
+
   return (
     <>
       <Modal opened={!!voucher} onClose={onClose} title={voucher.voucherNumber} centered size="lg">
@@ -64,38 +66,56 @@ export default function VoucherDetailModal({ voucher, onClose, onUpdate }) {
             {voucher.narration && <Text size="sm" c="dimmed" fs="italic">{voucher.narration}</Text>}
 
             <Text fw={600} size="sm">Line Items</Text>
-            <Table striped withTableBorder size="sm">
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>Item / Account</Table.Th>
-                  <Table.Th style={{ textAlign: 'right' }}>Qty</Table.Th>
-                  <Table.Th style={{ textAlign: 'right' }}>Rate</Table.Th>
-                  <Table.Th style={{ textAlign: 'right' }}>Amount</Table.Th>
-                  <Table.Th style={{ textAlign: 'right' }}>Tax</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {voucher.lineItems.map((li, i) => (
-                  <Table.Tr key={i}>
-                    <Table.Td>{li.itemId?.name || li.itemName || li.accountId?.name || '-'}</Table.Td>
-                    <Table.Td style={{ textAlign: 'right' }}>{li.quantity || '-'}</Table.Td>
-                    <Table.Td style={{ textAlign: 'right' }}>{li.rate?.toLocaleString('en-IN') || '-'}</Table.Td>
-                    <Table.Td style={{ textAlign: 'right' }}>{li.amount?.toLocaleString('en-IN') || '-'}</Table.Td>
-                    <Table.Td style={{ textAlign: 'right' }}>{li.taxAmount?.toLocaleString('en-IN') || '-'}</Table.Td>
+            {isAccountBased ? (
+              <Table striped withTableBorder size="sm">
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>Account</Table.Th>
+                    <Table.Th style={{ textAlign: 'right' }}>Debit</Table.Th>
+                    <Table.Th style={{ textAlign: 'right' }}>Credit</Table.Th>
+                    <Table.Th>Narration</Table.Th>
                   </Table.Tr>
-                ))}
-              </Table.Tbody>
-            </Table>
+                </Table.Thead>
+                <Table.Tbody>
+                  {voucher.lineItems.map((li, i) => (
+                    <Table.Tr key={i}>
+                      <Table.Td>{li.accountId?.name || '-'}</Table.Td>
+                      <Table.Td style={{ textAlign: 'right' }}>{li.debit ? fmtCurrency(li.debit) : '-'}</Table.Td>
+                      <Table.Td style={{ textAlign: 'right' }}>{li.credit ? fmtCurrency(li.credit) : '-'}</Table.Td>
+                      <Table.Td>{li.narration || '-'}</Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            ) : (
+              <Table striped withTableBorder size="sm">
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>Item</Table.Th>
+                    <Table.Th style={{ textAlign: 'right' }}>Qty</Table.Th>
+                    <Table.Th style={{ textAlign: 'right' }}>Rate</Table.Th>
+                    <Table.Th style={{ textAlign: 'right' }}>Amount</Table.Th>
+                    <Table.Th style={{ textAlign: 'right' }}>Tax</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {voucher.lineItems.map((li, i) => (
+                    <Table.Tr key={i}>
+                      <Table.Td>{li.itemId?.name || li.itemName || '-'}</Table.Td>
+                      <Table.Td style={{ textAlign: 'right' }}>{li.quantity || '-'}</Table.Td>
+                      <Table.Td style={{ textAlign: 'right' }}>{li.rate?.toLocaleString('en-IN') || '-'}</Table.Td>
+                      <Table.Td style={{ textAlign: 'right' }}>{li.amount?.toLocaleString('en-IN') || '-'}</Table.Td>
+                      <Table.Td style={{ textAlign: 'right' }}>{li.taxAmount?.toLocaleString('en-IN') || '-'}</Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            )}
 
-            <SimpleGrid cols={2}>
+            <Group justify="space-between">
               <div />
-              <Stack gap={4}>
-                <Group justify="space-between"><Text size="sm">Subtotal:</Text><Text size="sm">{fmtCurrency(voucher.subtotal)}</Text></Group>
-                <Group justify="space-between"><Text size="sm">Discount:</Text><Text size="sm">{fmtCurrency(voucher.totalDiscount)}</Text></Group>
-                <Group justify="space-between"><Text size="sm">Tax:</Text><Text size="sm">{fmtCurrency(voucher.totalTax)}</Text></Group>
-                <Group justify="space-between"><Text fw={700}>Grand Total:</Text><Text fw={700}>{fmtCurrency(voucher.grandTotal)}</Text></Group>
-              </Stack>
-            </SimpleGrid>
+              <Text fw={700} size="lg">Total: {fmtCurrency(voucher.grandTotal)}</Text>
+            </Group>
 
             <Group justify="flex-end">
               {voucher.status === 'draft' && <Button onClick={handlePost}>Post Voucher</Button>}

@@ -4,7 +4,7 @@ import { VOUCHER_TYPE_VALUES } from '../../config/constants.js';
 const lineItemSchema = Joi.object({
   itemId: Joi.string().allow(null).optional(),
   itemName: Joi.string().allow('').optional(),
-  quantity: Joi.number().min(0).default(0),
+  quantity: Joi.number().default(0),
   rate: Joi.number().min(0).default(0),
   amount: Joi.number().optional(), // auto-calculated
   discount: Joi.number().min(0).default(0),

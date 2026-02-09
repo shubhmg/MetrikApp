@@ -210,25 +210,12 @@ export default function VoucherCreate() {
       } else if (isAccountBased) {
         payload.lineItems = accountLines
           .filter((l) => l.accountId)
-          .map((l) => {
-            const line = {
-              accountId: l.accountId,
-              narration: l.narration || '',
-            };
-            
-            // Force correct debit/credit structure for Receipt/Payment with Party
-            if (voucherType === 'receipt' && partyId) {
-              line.debit = l.debit || 0;
-              line.credit = 0;
-            } else if (voucherType === 'payment' && partyId) {
-              line.debit = 0;
-              line.credit = l.credit || 0;
-            } else {
-              line.debit = l.debit || 0;
-              line.credit = l.credit || 0;
-            }
-            return line;
-          });
+          .map((l) => ({
+            accountId: l.accountId,
+            debit: l.debit || 0,
+            credit: l.credit || 0,
+            narration: l.narration || '',
+          }));
       }
 
       const createRes = await api.post('/vouchers', payload);

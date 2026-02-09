@@ -61,18 +61,16 @@ export default function PhysicalStockModal({ opened, onClose }) {
   async function handleSave() {
     setSaving(true);
     try {
+      // Build line items with signed quantities (positive = excess IN, negative = shortage OUT)
       const lineItems = [];
+
       items.forEach(item => {
         const systemQty = stockData[item._id] || 0;
         const physicalQty = item.physicalQty;
-        
+
         if (physicalQty !== undefined && physicalQty !== systemQty) {
           const diff = physicalQty - systemQty;
-          lineItems.push({
-            itemId: item._id,
-            quantity: diff,
-            rate: 0 
-          });
+          lineItems.push({ itemId: item._id, quantity: diff, rate: 0 });
         }
       });
 
@@ -82,17 +80,18 @@ export default function PhysicalStockModal({ opened, onClose }) {
         return;
       }
 
-      const voucherData = {
+      const payload = {
         voucherType: 'physical_stock',
-        date: new Date(),
+        date: new Date().toISOString(),
         materialCentreId: selectedMc,
-        lineItems
+        lineItems,
+        narration: 'Physical stock verification adjustment',
       };
 
-      const res = await api.post('/vouchers', voucherData);
+      const res = await api.post('/vouchers', payload);
       await api.post(`/vouchers/${res.data.data.voucher._id}/post`);
 
-      notifications.show({ title: 'Stock Updated', color: 'green' });
+      notifications.show({ title: 'Stock adjusted', color: 'green' });
       onClose();
     } catch (err) {
       notifications.show({ title: 'Error', message: err.response?.data?.message || 'Failed', color: 'red' });

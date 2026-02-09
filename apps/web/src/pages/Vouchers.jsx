@@ -21,6 +21,7 @@ const VOUCHER_TYPES = [
   { value: 'production', label: 'Production' },
   { value: 'sales_order', label: 'Sales Order' },
   { value: 'purchase_order', label: 'Purchase Order' },
+  { value: 'physical_stock', label: 'Physical Stock' },
 ];
 
 export default function Vouchers() {
