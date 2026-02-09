@@ -25,3 +25,8 @@ export const remove = catchAsync(async (req, res) => {
   await accountService.deleteAccount(req.params.id, req.businessId, req.user._id);
   res.json({ success: true, message: 'Account deleted' });
 });
+
+export const getLedger = catchAsync(async (req, res) => {
+  const ledger = await accountService.getAccountLedger(req.params.id, req.businessId, req.query);
+  res.json({ success: true, data: ledger });
+});

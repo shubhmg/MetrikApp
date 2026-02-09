@@ -11,6 +11,7 @@ import {
   Badge,
   ActionIcon,
   Alert,
+  Text,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
@@ -18,6 +19,7 @@ import { IconPencil, IconTrash } from '@tabler/icons-react';
 import PageHeader from '../components/PageHeader.jsx';
 import DataTable from '../components/DataTable.jsx';
 import ConfirmDelete from '../components/ConfirmDelete.jsx';
+import PartyLedgerModal from '../components/PartyLedgerModal.jsx';
 import api from '../services/api.js';
 
 const TYPE_OPTIONS = [
@@ -39,6 +41,7 @@ export default function Parties() {
   const [error, setError] = useState('');
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [ledgerParty, setLedgerParty] = useState(null);
 
   const form = useForm({ initialValues: EMPTY_FORM });
 
@@ -112,7 +115,22 @@ export default function Parties() {
     : parties;
 
   const columns = [
-    { key: 'name', label: 'Name', render: (r) => r.name },
+    { 
+      key: 'name', 
+      label: 'Name', 
+      render: (r) => (
+        <Text 
+          c="blue" 
+          style={{ cursor: 'pointer', textDecoration: 'underline' }} 
+          onClick={(e) => {
+            e.stopPropagation();
+            setLedgerParty(r);
+          }}
+        >
+          {r.name}
+        </Text>
+      ) 
+    },
     {
       key: 'type', label: 'Type',
       render: (r) => (
@@ -184,6 +202,12 @@ export default function Parties() {
         onConfirm={handleDelete}
         loading={deleting}
         name={deleteTarget?.name}
+      />
+
+      <PartyLedgerModal 
+        opened={!!ledgerParty} 
+        onClose={() => setLedgerParty(null)} 
+        party={ledgerParty}
       />
     </div>
   );

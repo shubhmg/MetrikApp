@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Title,
   Select,
@@ -56,22 +56,27 @@ const TYPE_GROUPS = [
     items: [
       { value: 'stock_transfer', label: 'Stock Transfer' },
       { value: 'production', label: 'Production' },
+      { value: 'physical_stock', label: 'Physical Stock' },
     ],
   },
 ];
 
 const PARTY_TYPES = ['sales_invoice', 'purchase_invoice', 'sales_return', 'purchase_return', 'payment', 'receipt', 'sales_order', 'purchase_order', 'delivery_note', 'grn'];
-const ITEM_TYPES = ['sales_invoice', 'purchase_invoice', 'sales_return', 'purchase_return', 'sales_order', 'purchase_order', 'delivery_note', 'grn', 'stock_transfer', 'production'];
+const ITEM_TYPES = ['sales_invoice', 'purchase_invoice', 'sales_return', 'purchase_return', 'sales_order', 'purchase_order', 'delivery_note', 'grn', 'stock_transfer', 'production', 'physical_stock'];
 const ACCOUNT_TYPES = ['payment', 'receipt', 'journal', 'contra'];
-const MC_TYPES = ['sales_invoice', 'purchase_invoice', 'sales_return', 'purchase_return', 'grn', 'delivery_note', 'production'];
+const MC_TYPES = ['sales_invoice', 'purchase_invoice', 'sales_return', 'purchase_return', 'grn', 'delivery_note', 'production', 'physical_stock'];
 const TRANSFER_TYPE = 'stock_transfer';
+
+// Voucher types that should be immediately posted
+const AUTO_POST_VOUCHER_TYPES = ['sales_invoice', 'receipt'];
 
 const EMPTY_ITEM_LINE = { itemId: '', quantity: 1, rate: 0, discount: 0, gstRate: 18 };
 const EMPTY_ACCOUNT_LINE = { accountId: '', debit: 0, credit: 0, narration: '' };
 
 export default function VoucherCreate() {
   const navigate = useNavigate();
-  const [voucherType, setVoucherType] = useState(null);
+  const [searchParams] = useSearchParams();
+  const [voucherType, setVoucherType] = useState(searchParams.get('type') || null);
   const [partyId, setPartyId] = useState(null);
   const [materialCentreId, setMaterialCentreId] = useState(null);
   const [fromMaterialCentreId, setFromMaterialCentreId] = useState(null);
@@ -112,6 +117,10 @@ export default function VoucherCreate() {
   const needsParty = PARTY_TYPES.includes(voucherType);
   const needsMc = MC_TYPES.includes(voucherType);
   const isTransfer = voucherType === TRANSFER_TYPE;
+  const shouldAutoPost = AUTO_POST_VOUCHER_TYPES.includes(voucherType);
+  
+  // Simple mode for Receipt/Payment with Party selected
+  const isSimpleMode = (voucherType === 'receipt' || voucherType === 'payment') && partyId;
 
   const partyData = useMemo(() => parties.map((p) => ({ value: p._id, label: p.name })), [parties]);
   const itemData = useMemo(() => items.map((i) => ({ value: i._id, label: `${i.sku} - ${i.name}` })), [items]);
@@ -167,7 +176,7 @@ export default function VoucherCreate() {
     return { totalDebit, totalCredit, balanced: Math.abs(totalDebit - totalCredit) < 0.01 };
   }, [accountLines]);
 
-  async function handleSave() {
+  async function handleSave(postImmediately = false) {
     if (!voucherType) {
       notifications.show({ title: 'Select type', message: 'Please select a voucher type', color: 'red' });
       return;
@@ -201,17 +210,38 @@ export default function VoucherCreate() {
       } else if (isAccountBased) {
         payload.lineItems = accountLines
           .filter((l) => l.accountId)
-          .map((l) => ({
-            accountId: l.accountId,
-            debit: l.debit || 0,
-            credit: l.credit || 0,
-            narration: l.narration || '',
-          }));
+          .map((l) => {
+            const line = {
+              accountId: l.accountId,
+              narration: l.narration || '',
+            };
+            
+            // Force correct debit/credit structure for Receipt/Payment with Party
+            if (voucherType === 'receipt' && partyId) {
+              line.debit = l.debit || 0;
+              line.credit = 0;
+            } else if (voucherType === 'payment' && partyId) {
+              line.debit = 0;
+              line.credit = l.credit || 0;
+            } else {
+              line.debit = l.debit || 0;
+              line.credit = l.credit || 0;
+            }
+            return line;
+          });
       }
 
-      await api.post('/vouchers', payload);
-      notifications.show({ title: 'Voucher created', message: 'Saved as draft', color: 'green' });
-      navigate('/vouchers');
+      const createRes = await api.post('/vouchers', payload);
+      const newVoucherId = createRes.data.data.voucher._id;
+
+      if (postImmediately) {
+        await api.post(`/vouchers/${newVoucherId}/post`);
+        notifications.show({ title: 'Voucher created and posted', color: 'green' });
+      } else {
+        notifications.show({ title: 'Voucher created', message: 'Saved as draft', color: 'green' });
+      }
+      
+      navigate(-1); // Go back to previous page
     } catch (err) {
       notifications.show({ title: 'Error', message: err.response?.data?.message || 'Failed to create', color: 'red' });
     }
@@ -223,7 +253,7 @@ export default function VoucherCreate() {
   return (
     <div>
       <Group mb="lg">
-        <ActionIcon variant="subtle" onClick={() => navigate('/vouchers')}><IconArrowLeft size={20} /></ActionIcon>
+        <ActionIcon variant="subtle" onClick={() => navigate(-1)}><IconArrowLeft size={20} /></ActionIcon>
         <Title order={2}>New Voucher</Title>
       </Group>
 
@@ -361,15 +391,21 @@ export default function VoucherCreate() {
         {isAccountBased && voucherType && (
           <Card withBorder>
             <Group justify="space-between" mb="sm">
-              <Text fw={600}>Journal Entries</Text>
+              <Text fw={600}>{isSimpleMode ? 'Payment Details' : 'Journal Entries'}</Text>
               <Button size="xs" variant="light" leftSection={<IconPlus size={14} />} onClick={addAccountLine}>Add Row</Button>
             </Group>
             <Table withTableBorder>
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th style={{ minWidth: 200 }}>Account</Table.Th>
-                  <Table.Th style={{ width: 120 }}>Debit</Table.Th>
-                  <Table.Th style={{ width: 120 }}>Credit</Table.Th>
+                  {isSimpleMode ? (
+                    <Table.Th style={{ width: 150 }}>Amount</Table.Th>
+                  ) : (
+                    <>
+                      <Table.Th style={{ width: 120 }}>Debit</Table.Th>
+                      <Table.Th style={{ width: 120 }}>Credit</Table.Th>
+                    </>
+                  )}
                   <Table.Th style={{ minWidth: 150 }}>Narration</Table.Th>
                   <Table.Th style={{ width: 40 }}></Table.Th>
                 </Table.Tr>
@@ -384,15 +420,36 @@ export default function VoucherCreate() {
                         onChange={(v) => updateAccountLine(idx, 'accountId', v)}
                         searchable
                         size="xs"
-                        placeholder="Select account..."
+                        placeholder={isSimpleMode ? (voucherType === 'receipt' ? "Select Cash/Bank Account" : "Select Payment Source") : "Select account..."}
                       />
                     </Table.Td>
-                    <Table.Td>
-                      <NumberInput size="xs" min={0} value={line.debit} onChange={(v) => updateAccountLine(idx, 'debit', v || 0)} />
-                    </Table.Td>
-                    <Table.Td>
-                      <NumberInput size="xs" min={0} value={line.credit} onChange={(v) => updateAccountLine(idx, 'credit', v || 0)} />
-                    </Table.Td>
+                    {isSimpleMode ? (
+                      <Table.Td>
+                        <NumberInput 
+                          size="xs" 
+                          min={0} 
+                          value={voucherType === 'receipt' ? line.debit : line.credit} 
+                          onChange={(v) => {
+                            if (voucherType === 'receipt') {
+                              updateAccountLine(idx, 'debit', v || 0);
+                              updateAccountLine(idx, 'credit', 0);
+                            } else {
+                              updateAccountLine(idx, 'credit', v || 0);
+                              updateAccountLine(idx, 'debit', 0);
+                            }
+                          }} 
+                        />
+                      </Table.Td>
+                    ) : (
+                      <>
+                        <Table.Td>
+                          <NumberInput size="xs" min={0} value={line.debit} onChange={(v) => updateAccountLine(idx, 'debit', v || 0)} />
+                        </Table.Td>
+                        <Table.Td>
+                          <NumberInput size="xs" min={0} value={line.credit} onChange={(v) => updateAccountLine(idx, 'credit', v || 0)} />
+                        </Table.Td>
+                      </>
+                    )}
                     <Table.Td>
                       <TextInput size="xs" value={line.narration} onChange={(e) => updateAccountLine(idx, 'narration', e.target.value)} />
                     </Table.Td>
@@ -407,11 +464,17 @@ export default function VoucherCreate() {
             </Table>
 
             <Group justify="flex-end" mt="sm" gap="lg">
-              <Text size="sm">Total Debit: <strong>{accountCalcs.totalDebit.toLocaleString('en-IN')}</strong></Text>
-              <Text size="sm">Total Credit: <strong>{accountCalcs.totalCredit.toLocaleString('en-IN')}</strong></Text>
-              <Badge color={accountCalcs.balanced ? 'green' : 'red'} variant="light">
-                {accountCalcs.balanced ? 'Balanced' : 'Not Balanced'}
-              </Badge>
+              {isSimpleMode ? (
+                <Text size="sm">Total Amount: <strong>{(voucherType === 'receipt' ? accountCalcs.totalDebit : accountCalcs.totalCredit).toLocaleString('en-IN')}</strong></Text>
+              ) : (
+                <>
+                  <Text size="sm">Total Debit: <strong>{accountCalcs.totalDebit.toLocaleString('en-IN')}</strong></Text>
+                  <Text size="sm">Total Credit: <strong>{accountCalcs.totalCredit.toLocaleString('en-IN')}</strong></Text>
+                  <Badge color={accountCalcs.balanced ? 'green' : 'red'} variant="light">
+                    {accountCalcs.balanced ? 'Balanced' : 'Not Balanced'}
+                  </Badge>
+                </>
+              )}
             </Group>
           </Card>
         )}
@@ -419,10 +482,16 @@ export default function VoucherCreate() {
         <Textarea label="Narration" value={narration} onChange={(e) => setNarration(e.target.value)} minRows={2} />
 
         <Group justify="flex-end">
-          <Button variant="default" onClick={() => navigate('/vouchers')}>Cancel</Button>
-          <Button onClick={handleSave} loading={saving} disabled={!voucherType}>
-            Save as Draft
-          </Button>
+          <Button variant="default" onClick={() => navigate(-1)}>Cancel</Button>
+          {shouldAutoPost ? (
+            <Button onClick={() => handleSave(true)} loading={saving} disabled={!voucherType}>
+              Save & Post
+            </Button>
+          ) : (
+            <Button onClick={() => handleSave(false)} loading={saving} disabled={!voucherType}>
+              Save as Draft
+            </Button>
+          )}
         </Group>
       </Stack>
     </div>

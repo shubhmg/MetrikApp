@@ -13,6 +13,7 @@ import deliveryNoteHandler from './deliveryNote.handler.js';
 import productionHandler from './production.handler.js';
 import salesOrderHandler from './salesOrder.handler.js';
 import purchaseOrderHandler from './purchaseOrder.handler.js';
+import physicalStockHandler from './physicalStock.handler.js';
 
 export function registerAllHandlers() {
   registerHandler(VOUCHER_TYPES.SALES_INVOICE, salesInvoiceHandler);
@@ -29,4 +30,5 @@ export function registerAllHandlers() {
   registerHandler(VOUCHER_TYPES.PRODUCTION, productionHandler);
   registerHandler(VOUCHER_TYPES.SALES_ORDER, salesOrderHandler);
   registerHandler(VOUCHER_TYPES.PURCHASE_ORDER, purchaseOrderHandler);
+  registerHandler(VOUCHER_TYPES.PHYSICAL_STOCK, physicalStockHandler);
 }

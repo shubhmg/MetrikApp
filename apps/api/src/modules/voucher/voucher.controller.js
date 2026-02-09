@@ -31,3 +31,8 @@ export const cancel = catchAsync(async (req, res) => {
   );
   res.json({ success: true, data: { voucher } });
 });
+
+export const getStockSummary = catchAsync(async (req, res) => {
+  const stock = await voucherService.getStockSummary(req.businessId, req.query);
+  res.json({ success: true, data: { stock } });
+});

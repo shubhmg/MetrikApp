@@ -5,8 +5,11 @@ import Dashboard from './pages/Dashboard.jsx';
 import Vouchers from './pages/Vouchers.jsx';
 import VoucherCreate from './pages/VoucherCreate.jsx';
 import Inventory from './pages/Inventory.jsx';
+import Items from './pages/Items.jsx';
 import Parties from './pages/Parties.jsx';
 import Accounting from './pages/Accounting.jsx';
+import SalesInvoices from './pages/SalesInvoices.jsx';
+import Receipts from './pages/Receipts.jsx';
 import { useAuthStore } from './store/authStore.js';
 
 function ProtectedRoute({ children }) {
@@ -48,6 +51,9 @@ export const router = createBrowserRouter([
     ),
     children: [
       { index: true, element: <Dashboard /> },
+      { path: 'items', element: <Items /> },
+      { path: 'sales-invoices', element: <SalesInvoices /> },
+      { path: 'receipts', element: <Receipts /> },
       { path: 'vouchers', element: <Vouchers /> },
       { path: 'vouchers/new', element: <VoucherCreate /> },
       { path: 'inventory', element: <Inventory /> },

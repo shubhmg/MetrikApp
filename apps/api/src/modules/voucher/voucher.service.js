@@ -1,4 +1,5 @@
 import Voucher from './voucher.model.js';
+import StockSummary from './stockSummary.model.js';
 import * as voucherEngine from '../../engines/voucher.engine.js';
 import ApiError from '../../utils/ApiError.js';
 
@@ -56,4 +57,30 @@ export async function postVoucher(id, businessId, userId, req) {
 
 export async function cancelVoucher(id, businessId, userId, reason, req) {
   return voucherEngine.cancel(id, businessId, userId, reason, req);
+}
+
+export async function getStockSummary(businessId, filters = {}) {
+  const query = { businessId };
+  if (filters.materialCentreId) query.materialCentreId = filters.materialCentreId;
+  if (filters.itemId) query.itemId = filters.itemId;
+
+  const populateOptions = {
+    path: 'itemId',
+    select: 'name sku unit itemGroupId',
+    populate: { path: 'itemGroupId', select: 'name' }
+  };
+
+  if (filters.itemGroupId) {
+    populateOptions.match = { itemGroupId: filters.itemGroupId };
+  }
+
+  const results = await StockSummary.find(query)
+    .populate(populateOptions)
+    .populate('materialCentreId', 'name code');
+
+  if (filters.itemGroupId) {
+    return results.filter(r => r.itemId);
+  }
+
+  return results;
 }

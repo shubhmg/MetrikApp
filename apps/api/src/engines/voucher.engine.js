@@ -106,11 +106,22 @@ export async function create(data, businessId, userId) {
 
   if (data.lineItems && data.lineItems.length > 0) {
     for (const item of data.lineItems) {
-      item.amount = (item.quantity || 0) * (item.rate || 0);
-      item.taxAmount = ((item.amount - (item.discount || 0)) * (item.gstRate || 0)) / 100;
-      subtotal += item.amount;
-      totalDiscount += item.discount || 0;
-      totalTax += item.taxAmount;
+      if (item.quantity !== undefined && item.rate !== undefined) {
+        item.amount = (item.quantity || 0) * (item.rate || 0);
+        item.taxAmount = ((item.amount - (item.discount || 0)) * (item.gstRate || 0)) / 100;
+        subtotal += item.amount;
+        totalDiscount += item.discount || 0;
+        totalTax += item.taxAmount;
+      } else {
+        // Account based logic
+        if (data.voucherType === 'payment') {
+          // For payments, the line items are CREDITS (Cash/Bank)
+          subtotal += (item.credit || 0);
+        } else {
+          // For receipts (DEBITS to Cash/Bank) and Journals (sum of debits)
+          subtotal += (item.debit || 0);
+        }
+      }
     }
   }
 

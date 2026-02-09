@@ -1,4 +1,5 @@
 import Account from './account.model.js';
+import JournalEntry from '../voucher/journalEntry.model.js';
 import ApiError from '../../utils/ApiError.js';
 
 export async function createAccount(data, businessId, userId) {
@@ -57,4 +58,65 @@ export async function deleteAccount(id, businessId, userId) {
   }
 
   return account.softDelete(userId);
+}
+
+export async function getAccountLedger(accountId, businessId, filters = {}) {
+  const account = await Account.findOne({ _id: accountId, businessId });
+  if (!account) throw ApiError.notFound('Account not found');
+
+  const query = {
+    businessId,
+    accountId,
+  };
+
+  if (filters.financialYear) {
+    query.financialYear = filters.financialYear;
+  }
+
+  if (filters.fromDate || filters.toDate) {
+    query.date = {};
+    if (filters.fromDate) query.date.$gte = new Date(filters.fromDate);
+    if (filters.toDate) query.date.$lte = new Date(filters.toDate);
+  }
+
+  const entries = await JournalEntry.find(query)
+    .sort({ date: 1, createdAt: 1 })
+    .lean();
+
+  // Calculate opening balance
+  const initialDebit = account.openingBalance?.debit || 0;
+  const initialCredit = account.openingBalance?.credit || 0;
+  let openingBalance = initialDebit - initialCredit;
+
+  // If filtering, add previous transactions to opening balance
+  const preQuery = {
+    businessId,
+    accountId,
+  };
+  let hasPreQuery = false;
+
+  if (filters.fromDate) {
+    preQuery.date = { $lt: new Date(filters.fromDate) };
+    hasPreQuery = true;
+  } else if (filters.financialYear) {
+    preQuery.financialYear = { $lt: filters.financialYear };
+    hasPreQuery = true;
+  }
+
+  if (hasPreQuery) {
+    const result = await JournalEntry.aggregate([
+      { $match: preQuery },
+      { $group: { _id: null, totalDebit: { $sum: '$debit' }, totalCredit: { $sum: '$credit' } } },
+    ]);
+
+    if (result.length > 0) {
+      openingBalance += (result[0].totalDebit - result[0].totalCredit);
+    }
+  }
+
+  return {
+    account,
+    openingBalance,
+    entries,
+  };
 }

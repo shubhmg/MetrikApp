@@ -13,6 +13,7 @@ export const VOUCHER_TYPES = {
   SALES_ORDER: 'sales_order',
   PURCHASE_ORDER: 'purchase_order',
   DELIVERY_NOTE: 'delivery_note',
+  PHYSICAL_STOCK: 'physical_stock',
 };
 
 export const VOUCHER_TYPE_VALUES = Object.values(VOUCHER_TYPES);
@@ -32,6 +33,7 @@ export const VOUCHER_PREFIX = {
   [VOUCHER_TYPES.SALES_ORDER]: 'SOR',
   [VOUCHER_TYPES.PURCHASE_ORDER]: 'POR',
   [VOUCHER_TYPES.DELIVERY_NOTE]: 'DLV',
+  [VOUCHER_TYPES.PHYSICAL_STOCK]: 'PHY',
 };
 
 export const VOUCHER_STATUS = {

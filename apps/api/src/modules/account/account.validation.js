@@ -39,3 +39,12 @@ export const listAccountSchema = {
     search: Joi.string().optional(),
   }),
 };
+
+export const getLedgerSchema = {
+  params: Joi.object({ id: Joi.string().required() }),
+  query: Joi.object({
+    financialYear: Joi.string().pattern(/^\d{4}-\d{2}$/).optional(),
+    fromDate: Joi.date().iso().optional(),
+    toDate: Joi.date().iso().optional(),
+  }),
+};

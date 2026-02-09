@@ -16,12 +16,16 @@ import {
   IconUsers,
   IconReportMoney,
   IconSettings,
+  IconBox,
 } from '@tabler/icons-react';
 import { useAuth } from '../../hooks/useAuth.js';
 
 const NAV_ITEMS = [
   { path: '/', label: 'Dashboard', icon: IconLayoutDashboard },
-  { path: '/vouchers', label: 'Vouchers', icon: IconFileInvoice },
+  { path: '/items', label: 'Items', icon: IconBox },
+  { path: '/sales-invoices', label: 'Sales Invoices', icon: IconFileInvoice },
+  { path: '/receipts', label: 'Receipts', icon: IconReportMoney },
+  { path: '/vouchers', label: 'All Vouchers', icon: IconFileInvoice },
   { path: '/inventory', label: 'Inventory', icon: IconPackage },
   { path: '/parties', label: 'Parties', icon: IconUsers },
   { path: '/accounting', label: 'Accounting', icon: IconReportMoney },
