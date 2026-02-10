@@ -88,8 +88,7 @@ export default function PhysicalStockModal({ opened, onClose }) {
         narration: 'Physical stock verification adjustment',
       };
 
-      const res = await api.post('/vouchers', payload);
-      await api.post(`/vouchers/${res.data.data.voucher._id}/post`);
+      await api.post('/vouchers', payload);
 
       notifications.show({ title: 'Stock adjusted', color: 'green' });
       onClose();
@@ -160,7 +159,7 @@ export default function PhysicalStockModal({ opened, onClose }) {
           )}
           <Group justify="flex-end" mt="md">
             <Button variant="default" onClick={onClose}>Cancel</Button>
-            <Button onClick={handleSave} loading={saving}>Save & Post</Button>
+            <Button onClick={handleSave} loading={saving}>Save</Button>
           </Group>
         </>
       )}

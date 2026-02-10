@@ -1,6 +1,9 @@
-import { Table, Text, Center, Loader } from '@mantine/core';
+import { Table, Text, Center, Loader, Stack } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 
-export default function DataTable({ columns, data, loading, emptyMessage = 'No data found', onRowClick }) {
+export default function DataTable({ columns, data, loading, emptyMessage = 'No data found', onRowClick, mobileRender }) {
+  const isMobile = useMediaQuery('(max-width: 48em)');
+
   if (loading) {
     return (
       <Center py="xl">
@@ -17,6 +20,16 @@ export default function DataTable({ columns, data, loading, emptyMessage = 'No d
     );
   }
 
+  // Mobile card view
+  if (isMobile && mobileRender) {
+    return (
+      <Stack gap="xs">
+        {data.map((row, i) => mobileRender(row, i))}
+      </Stack>
+    );
+  }
+
+  // Desktop table view
   return (
     <Table striped highlightOnHover withTableBorder>
       <Table.Thead>

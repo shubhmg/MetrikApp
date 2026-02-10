@@ -1,8 +1,6 @@
 import { useMemo } from 'react';
 import { Box, Card, Stack, Group, Text, Badge } from '@mantine/core';
 
-const STATUS_COLORS = { draft: 'yellow', posted: 'green', cancelled: 'red' };
-
 function fmtDate(d) {
   return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 }
@@ -41,7 +39,7 @@ function VoucherGroup({ date, vouchers, onClick }) {
                   <Text size="sm" fw={500}>{v.partyId?.name || 'No Party'}</Text>
                   <Group gap="xs">
                     <Text size="xs" c="dimmed" ff="monospace">{v.voucherNumber}</Text>
-                    <Badge size="xs" variant="dot" color={STATUS_COLORS[v.status]}>{v.status}</Badge>
+                    {v.status === 'cancelled' && <Badge size="xs" variant="dot" color="red">cancelled</Badge>}
                   </Group>
                 </Box>
                 <Box style={{ textAlign: 'right' }}>

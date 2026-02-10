@@ -15,6 +15,8 @@ import {
   Center,
   Loader,
   Title,
+  Card,
+  Text,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
@@ -169,29 +171,49 @@ export default function Inventory() {
         </Tabs.List>
 
         <Tabs.Panel value="stock">
-          <Group mb="md" justify="space-between">
-            <Group>
-              <Select 
-                placeholder="Filter by Material Centre" 
+          <Stack gap="sm" mb="md">
+            <Group grow>
+              <Select
+                placeholder="Filter by MC"
                 data={mcs.map(m => ({ value: m._id, label: m.name }))}
                 value={stockMcFilter}
                 onChange={setStockMcFilter}
                 clearable
-                w={250}
               />
-              <Select 
-                placeholder="Filter by Group" 
+              <Select
+                placeholder="Filter by Group"
                 data={groups.map(g => ({ value: g._id, label: g.name }))}
                 value={stockGroupFilter}
                 onChange={setStockGroupFilter}
                 clearable
-                w={250}
               />
-              <Button variant="light" onClick={loadStockReport}>Refresh</Button>
             </Group>
-            <Button variant="light" onClick={() => setPhysicalStockOpen(true)}>Physical Stock</Button>
-          </Group>
-          <DataTable columns={stockColumns} data={stockData} loading={stockLoading} emptyMessage="No stock data found" />
+            <Group>
+              <Button variant="light" onClick={loadStockReport}>Refresh</Button>
+              <Button variant="light" onClick={() => setPhysicalStockOpen(true)}>Physical Stock</Button>
+            </Group>
+          </Stack>
+          <DataTable
+            columns={stockColumns}
+            data={stockData}
+            loading={stockLoading}
+            emptyMessage="No stock data found"
+            mobileRender={(r) => (
+              <Card key={r._id} withBorder padding="sm">
+                <Group justify="space-between" wrap="nowrap">
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <Text fw={600} truncate>{r.itemId?.name || 'Unknown'}</Text>
+                    <Text size="xs" c="dimmed" ff="monospace">{r.itemId?.sku || '-'}</Text>
+                    <Group gap={6} mt={4}>
+                      {r.itemId?.itemGroupId?.name && <Badge variant="light" size="xs">{r.itemId.itemGroupId.name}</Badge>}
+                      {r.materialCentreId?.name && <Badge variant="light" size="xs" color="blue">{r.materialCentreId.name}</Badge>}
+                    </Group>
+                  </div>
+                  <Text fw={700} size="lg">{r.quantity} <Text span size="xs" c="dimmed">{r.itemId?.unit || ''}</Text></Text>
+                </Group>
+              </Card>
+            )}
+          />
         </Tabs.Panel>
 
         <Tabs.Panel value="centres">

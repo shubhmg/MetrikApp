@@ -68,7 +68,7 @@ const voucherSchema = new mongoose.Schema({
   status: {
     type: String,
     enum: Object.values(VOUCHER_STATUS),
-    default: VOUCHER_STATUS.DRAFT,
+    default: VOUCHER_STATUS.POSTED,
   },
   postedAt: Date,
   postedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

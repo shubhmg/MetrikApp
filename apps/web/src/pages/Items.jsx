@@ -14,6 +14,8 @@ import {
   Center,
   Loader,
   Title,
+  Card,
+  Text,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
@@ -205,14 +207,56 @@ export default function Items() {
           <Group justify="flex-end" mb="sm">
             <Button leftSection={<IconPlus size={16} />} onClick={openItemCreate}>Add Item</Button>
           </Group>
-          <DataTable columns={itemColumns} data={items} emptyMessage="No items yet" />
+          <DataTable
+            columns={itemColumns}
+            data={items}
+            emptyMessage="No items yet"
+            mobileRender={(r) => (
+              <Card key={r._id} withBorder padding="sm">
+                <Group justify="space-between" wrap="nowrap">
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <Text fw={600} truncate>{r.name}</Text>
+                    <Text size="xs" c="dimmed" ff="monospace">{r.sku}</Text>
+                    <Group gap={6} mt={4}>
+                      {r.itemGroupId?.name && <Badge variant="light" size="sm">{r.itemGroupId.name}</Badge>}
+                      <Text size="xs" c="dimmed">{r.unit}</Text>
+                      <Text size="xs" c="dimmed">GST {r.gstRate}%</Text>
+                    </Group>
+                  </div>
+                  <Group gap={4}>
+                    <ActionIcon variant="subtle" onClick={() => openItemEdit(r)}><IconPencil size={16} /></ActionIcon>
+                    <ActionIcon variant="subtle" color="red" onClick={() => { setDeleteTarget(r); setDeleteType('item'); }}><IconTrash size={16} /></ActionIcon>
+                  </Group>
+                </Group>
+              </Card>
+            )}
+          />
         </Tabs.Panel>
 
         <Tabs.Panel value="groups">
           <Group justify="flex-end" mb="sm">
             <Button leftSection={<IconPlus size={16} />} onClick={openGroupCreate}>Add Group</Button>
           </Group>
-          <DataTable columns={groupColumns} data={groups} emptyMessage="No item groups yet" />
+          <DataTable
+            columns={groupColumns}
+            data={groups}
+            emptyMessage="No item groups yet"
+            mobileRender={(r) => (
+              <Card key={r._id} withBorder padding="sm">
+                <Group justify="space-between" wrap="nowrap">
+                  <div>
+                    <Text fw={600}>{r.name}</Text>
+                    <Text size="xs" c="dimmed" ff="monospace">{r.code}</Text>
+                    <Badge variant="light" size="sm" mt={4}>{r.type.replace(/_/g, ' ')}</Badge>
+                  </div>
+                  <Group gap={4}>
+                    <ActionIcon variant="subtle" onClick={() => openGroupEdit(r)}><IconPencil size={16} /></ActionIcon>
+                    <ActionIcon variant="subtle" color="red" onClick={() => { setDeleteTarget(r); setDeleteType('group'); }}><IconTrash size={16} /></ActionIcon>
+                  </Group>
+                </Group>
+              </Card>
+            )}
+          />
         </Tabs.Panel>
       </Tabs>
 

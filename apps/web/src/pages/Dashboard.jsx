@@ -13,20 +13,34 @@ import {
   Loader,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { IconPlus } from '@tabler/icons-react';
+import { IconPlus, IconClipboardList, IconClipboardCheck } from '@tabler/icons-react';
+import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore.js';
 import api from '../services/api.js';
 
 export default function Dashboard() {
   const { user, currentBusinessId } = useAuthStore();
   const { setCurrentBusiness } = useAuthStore();
+  const navigate = useNavigate();
   const [businesses, setBusinesses] = useState([]);
   const [showCreate, setShowCreate] = useState(false);
   const [newBizName, setNewBizName] = useState('');
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [salesOrderCount, setSalesOrderCount] = useState(0);
+  const [purchaseOrderCount, setPurchaseOrderCount] = useState(0);
 
   useEffect(() => { loadBusinesses(); }, []);
+
+  useEffect(() => {
+    if (!currentBusinessId) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const base = (type) => `/vouchers?voucherType=${type}&status=posted&fromDate=${today}&toDate=${today}&limit=1`;
+    Promise.all([
+      api.get(base('sales_order')).then(({ data }) => data.data.total).catch(() => 0),
+      api.get(base('purchase_order')).then(({ data }) => data.data.total).catch(() => 0),
+    ]).then(([so, po]) => { setSalesOrderCount(so); setPurchaseOrderCount(po); });
+  }, [currentBusinessId]);
 
   async function loadBusinesses() {
     try {
@@ -65,6 +79,39 @@ export default function Dashboard() {
     <div>
       <Title order={2} mb={4}>Dashboard</Title>
       <Text c="dimmed" mb="lg">Welcome, {user?.name}</Text>
+
+      {currentBusinessId && (
+        <SimpleGrid cols={{ base: 1, xs: 2 }} mb="lg">
+          <Card
+            withBorder
+            padding="lg"
+            style={{ cursor: 'pointer' }}
+            onClick={() => navigate('/sales-orders')}
+          >
+            <Group gap="sm">
+              <IconClipboardList size={24} stroke={1.5} color="var(--mantine-color-blue-6)" />
+              <div>
+                <Text size="xl" fw={700}>{salesOrderCount}</Text>
+                <Text size="sm" c="dimmed">Sales Orders Today</Text>
+              </div>
+            </Group>
+          </Card>
+          <Card
+            withBorder
+            padding="lg"
+            style={{ cursor: 'pointer' }}
+            onClick={() => navigate('/purchase-orders')}
+          >
+            <Group gap="sm">
+              <IconClipboardCheck size={24} stroke={1.5} color="var(--mantine-color-teal-6)" />
+              <div>
+                <Text size="xl" fw={700}>{purchaseOrderCount}</Text>
+                <Text size="sm" c="dimmed">Purchase Orders Today</Text>
+              </div>
+            </Group>
+          </Card>
+        </SimpleGrid>
+      )}
 
       <Group justify="space-between" mb="md">
         <Title order={3}>Your Businesses</Title>
@@ -109,7 +156,7 @@ export default function Dashboard() {
                 style={{
                   cursor: 'pointer',
                   borderColor: isActive ? 'var(--mantine-color-blue-5)' : undefined,
-                  backgroundColor: isActive ? 'var(--mantine-color-blue-0)' : undefined,
+                  backgroundColor: isActive ? 'var(--mantine-color-primary-light)' : undefined,
                 }}
                 onClick={() => setCurrentBusiness(biz._id)}
               >

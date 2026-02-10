@@ -7,11 +7,14 @@ import VoucherCreate from './pages/VoucherCreate.jsx';
 import Inventory from './pages/Inventory.jsx';
 import Items from './pages/Items.jsx';
 import Parties from './pages/Parties.jsx';
+import PartyLedger from './pages/PartyLedger.jsx';
 import Accounting from './pages/Accounting.jsx';
 import SalesInvoices from './pages/SalesInvoices.jsx';
 import Boms from './pages/Boms.jsx';
 import Productions from './pages/Productions.jsx';
 import Receipts from './pages/Receipts.jsx';
+import SalesOrders from './pages/SalesOrders.jsx';
+import PurchaseOrders from './pages/PurchaseOrders.jsx';
 import { useAuthStore } from './store/authStore.js';
 
 function ProtectedRoute({ children }) {
@@ -56,12 +59,16 @@ export const router = createBrowserRouter([
       { path: 'items', element: <Items /> },
       { path: 'boms', element: <Boms /> },
       { path: 'productions', element: <Productions /> },
+      { path: 'sales-orders', element: <SalesOrders /> },
+      { path: 'purchase-orders', element: <PurchaseOrders /> },
       { path: 'sales-invoices', element: <SalesInvoices /> },
       { path: 'receipts', element: <Receipts /> },
       { path: 'vouchers', element: <Vouchers /> },
       { path: 'vouchers/new', element: <VoucherCreate /> },
+      { path: 'vouchers/:id/edit', element: <VoucherCreate /> },
       { path: 'inventory', element: <Inventory /> },
       { path: 'parties', element: <Parties /> },
+      { path: 'parties/:id/ledger', element: <PartyLedger /> },
       { path: 'accounting', element: <Accounting /> },
       { path: 'settings', element: <Placeholder title="Settings" /> },
     ],

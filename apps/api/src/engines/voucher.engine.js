@@ -12,8 +12,7 @@ import { emitAudit } from '../events/handlers/auditHandler.js';
 /**
  * Voucher Engine - Central orchestration for voucher lifecycle.
  *
- * create()  → validate + generate number + save draft
- * post()    → finalize: inventory + accounting in transaction
+ * create()  → validate + generate number + post inventory/accounting + save as posted
  * cancel()  → reverse entries in transaction
  *
  * Type-specific handlers implement:
@@ -77,8 +76,57 @@ async function resolveAccountIds(journalEntries, businessId) {
 }
 
 /**
- * Create a draft voucher.
- * Generates voucher number atomically via VoucherSequence.
+ * Calculate totals from line items.
+ * Returns { subtotal, totalDiscount, totalTax, grandTotal } and mutates line items
+ * with computed amount/taxAmount.
+ */
+export function calculateTotals(lineItems, voucherType) {
+  let subtotal = 0;
+  let totalDiscount = 0;
+  let totalTax = 0;
+
+  if (lineItems && lineItems.length > 0) {
+    for (const item of lineItems) {
+      if (item.itemId) {
+        item.amount = (item.quantity || 0) * (item.rate || 0);
+        item.taxAmount = ((item.amount - (item.discount || 0)) * (item.gstRate || 0)) / 100;
+        subtotal += item.amount;
+        totalDiscount += item.discount || 0;
+        totalTax += item.taxAmount;
+      } else if (item.accountId) {
+        if (voucherType === 'payment') {
+          subtotal += (item.credit || 0);
+        } else {
+          subtotal += (item.debit || 0);
+        }
+      }
+    }
+  }
+
+  const grandTotal = subtotal - totalDiscount + totalTax;
+  return { subtotal, totalDiscount, totalTax, grandTotal };
+}
+
+/**
+ * Check if the connected MongoDB supports transactions (replica set or mongos).
+ * Standalone instances don't support transactions — we fall back to non-transactional mode in dev.
+ */
+async function supportsTransactions() {
+  try {
+    const admin = mongoose.connection.db.admin();
+    const info = await admin.serverStatus();
+    // Replica set or sharded cluster
+    return !!info.repl || info.process === 'mongos';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Create and immediately post a voucher — single atomic operation.
+ * Validates, generates number, calculates totals, runs inventory + accounting engines,
+ * and saves with status POSTED.
+ * Uses a transaction if replica set is available, otherwise runs without one (dev mode).
  */
 export async function create(data, businessId, userId) {
   const handler = getHandler(data.voucherType);
@@ -100,79 +148,8 @@ export async function create(data, businessId, userId) {
   );
 
   // Calculate totals from line items
-  let subtotal = 0;
-  let totalDiscount = 0;
-  let totalTax = 0;
+  const { subtotal, totalDiscount, totalTax, grandTotal } = calculateTotals(data.lineItems, data.voucherType);
 
-  if (data.lineItems && data.lineItems.length > 0) {
-    for (const item of data.lineItems) {
-      if (item.itemId) {
-        // Item-based line: calculate amount from qty * rate
-        item.amount = (item.quantity || 0) * (item.rate || 0);
-        item.taxAmount = ((item.amount - (item.discount || 0)) * (item.gstRate || 0)) / 100;
-        subtotal += item.amount;
-        totalDiscount += item.discount || 0;
-        totalTax += item.taxAmount;
-      } else if (item.accountId) {
-        // Account-based line: use debit/credit
-        if (data.voucherType === 'payment') {
-          subtotal += (item.credit || 0);
-        } else {
-          subtotal += (item.debit || 0);
-        }
-      }
-    }
-  }
-
-  const grandTotal = subtotal - totalDiscount + totalTax;
-
-  const voucher = await Voucher.create({
-    ...data,
-    businessId,
-    voucherNumber,
-    financialYear,
-    subtotal,
-    totalDiscount,
-    totalTax,
-    grandTotal,
-    status: VOUCHER_STATUS.DRAFT,
-    createdBy: userId,
-    updatedBy: userId,
-  });
-
-  emitAudit({
-    businessId,
-    userId,
-    action: 'create',
-    module: 'voucher',
-    documentId: voucher._id,
-    documentType: data.voucherType,
-    after: voucher.toObject(),
-  });
-
-  return voucher;
-}
-
-/**
- * Check if the connected MongoDB supports transactions (replica set or mongos).
- * Standalone instances don't support transactions — we fall back to non-transactional mode in dev.
- */
-async function supportsTransactions() {
-  try {
-    const admin = mongoose.connection.db.admin();
-    const info = await admin.serverStatus();
-    // Replica set or sharded cluster
-    return !!info.repl || info.process === 'mongos';
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Post a draft voucher — finalize with inventory + accounting.
- * Uses a transaction if replica set is available, otherwise runs without one (dev mode).
- */
-export async function post(voucherId, businessId, userId, req) {
   const useTxn = await supportsTransactions();
   let session = null;
 
@@ -182,23 +159,34 @@ export async function post(voucherId, businessId, userId, req) {
   }
 
   try {
-    const findOpts = session ? { session } : {};
-    const voucher = await Voucher.findOne({ _id: voucherId, businessId }, null, findOpts);
-    if (!voucher) throw ApiError.notFound('Voucher not found');
-    if (voucher.status !== VOUCHER_STATUS.DRAFT) {
-      throw ApiError.badRequest(`Cannot post voucher with status: ${voucher.status}`);
-    }
+    // Save the voucher as posted
+    const now = new Date();
+    const voucherDoc = new Voucher({
+      ...data,
+      businessId,
+      voucherNumber,
+      financialYear,
+      subtotal,
+      totalDiscount,
+      totalTax,
+      grandTotal,
+      status: VOUCHER_STATUS.POSTED,
+      postedAt: now,
+      postedBy: userId,
+      createdBy: userId,
+      updatedBy: userId,
+    });
 
-    const handler = getHandler(voucher.voucherType);
+    await voucherDoc.save(session ? { session } : {});
 
     // Get inventory entries from handler
     const inventoryEntries = handler.getInventoryEntries
-      ? handler.getInventoryEntries(voucher)
+      ? handler.getInventoryEntries(voucherDoc)
       : [];
 
     // Get journal entries from handler
     const journalEntries = handler.getJournalEntries
-      ? handler.getJournalEntries(voucher)
+      ? handler.getJournalEntries(voucherDoc)
       : [];
 
     // Post inventory (creates ledger docs + updates stock summary)
@@ -206,33 +194,25 @@ export async function post(voucherId, businessId, userId, req) {
       await inventoryEngine.postEntries(inventoryEntries, session);
     }
 
-    // Resolve symbolic account codes to real accountIds
+    // Resolve symbolic account codes to real accountIds and post
     if (journalEntries.length > 0) {
       await resolveAccountIds(journalEntries, businessId);
       await accountingEngine.postEntries(journalEntries, session);
     }
-
-    // Update voucher status
-    voucher.status = VOUCHER_STATUS.POSTED;
-    voucher.postedAt = new Date();
-    voucher.postedBy = userId;
-    voucher.updatedBy = userId;
-    await voucher.save(session ? { session } : {});
 
     if (session) await session.commitTransaction();
 
     emitAudit({
       businessId,
       userId,
-      action: 'post',
+      action: 'create',
       module: 'voucher',
-      documentId: voucher._id,
-      documentType: voucher.voucherType,
-      after: voucher.toObject(),
-      req,
+      documentId: voucherDoc._id,
+      documentType: data.voucherType,
+      after: voucherDoc.toObject(),
     });
 
-    return voucher;
+    return voucherDoc;
   } catch (err) {
     if (session) await session.abortTransaction();
     throw err;
@@ -300,4 +280,158 @@ export async function cancel(voucherId, businessId, userId, reason, req) {
   }
 }
 
-export default { registerHandler, getHandler, create, post, cancel };
+// Types that don't post inventory/accounting entries (commitment records only)
+const NON_POSTING_TYPES = ['sales_order', 'purchase_order'];
+
+/**
+ * Update a posted voucher.
+ * Non-posting types (orders): direct update.
+ * Posting types: reverse old entries → update doc → post new entries (same voucherNumber/_id).
+ */
+export async function update(voucherId, data, businessId, userId, req) {
+  const voucher = await Voucher.findOne({ _id: voucherId, businessId });
+  if (!voucher) throw ApiError.notFound('Voucher not found');
+  if (voucher.status !== VOUCHER_STATUS.POSTED) {
+    throw ApiError.badRequest(`Cannot edit voucher with status: ${voucher.status}`);
+  }
+
+  // Block if downstream linked vouchers exist (e.g. PO converted to invoice, invoice with return)
+  const downstream = await Voucher.findOne({
+    'linkedVouchers.voucherId': voucherId,
+    status: VOUCHER_STATUS.POSTED,
+    businessId,
+  });
+  if (downstream) {
+    throw ApiError.badRequest(
+      `Cannot edit: voucher has downstream linked voucher ${downstream.voucherNumber}`
+    );
+  }
+
+  // Date change cannot cross financial year boundary
+  const newDate = new Date(data.date);
+  const newFY = getFinancialYear(newDate);
+  if (newFY !== voucher.financialYear) {
+    throw ApiError.badRequest(
+      `Date change would cross financial year boundary (${voucher.financialYear} → ${newFY}). Create a new voucher instead.`
+    );
+  }
+
+  const handler = getHandler(voucher.voucherType);
+  const before = voucher.toObject();
+
+  // Validate new data using handler
+  if (handler.validate) {
+    await handler.validate({ ...data, voucherType: voucher.voucherType });
+  }
+
+  // Recalculate totals
+  const { subtotal, totalDiscount, totalTax, grandTotal } = calculateTotals(data.lineItems, voucher.voucherType);
+
+  if (NON_POSTING_TYPES.includes(voucher.voucherType)) {
+    // --- Non-posting path: direct update ---
+    voucher.date = newDate;
+    voucher.partyId = data.partyId || voucher.partyId;
+    voucher.materialCentreId = data.materialCentreId || voucher.materialCentreId;
+    voucher.lineItems = data.lineItems;
+    voucher.narration = data.narration ?? voucher.narration;
+    voucher.bomId = data.bomId || voucher.bomId;
+    voucher.fromMaterialCentreId = data.fromMaterialCentreId || voucher.fromMaterialCentreId;
+    voucher.toMaterialCentreId = data.toMaterialCentreId || voucher.toMaterialCentreId;
+    voucher.subtotal = subtotal;
+    voucher.totalDiscount = totalDiscount;
+    voucher.totalTax = totalTax;
+    voucher.grandTotal = grandTotal;
+    voucher.updatedBy = userId;
+    await voucher.save();
+
+    emitAudit({
+      businessId,
+      userId,
+      action: 'update',
+      module: 'voucher',
+      documentId: voucher._id,
+      documentType: voucher.voucherType,
+      before,
+      after: voucher.toObject(),
+      req,
+    });
+
+    return voucher;
+  }
+
+  // --- Posting path: reverse old entries → update → post new entries ---
+  const useTxn = await supportsTransactions();
+  let session = null;
+
+  if (useTxn) {
+    session = await mongoose.startSession();
+    session.startTransaction();
+  }
+
+  try {
+    const findOpts = session ? { session } : {};
+
+    // Reverse old inventory + accounting entries
+    await inventoryEngine.reverseEntries(voucherId, businessId, session);
+    await accountingEngine.reverseEntries(voucherId, businessId, session);
+
+    // Update voucher document with new data
+    voucher.date = newDate;
+    voucher.partyId = data.partyId || voucher.partyId;
+    voucher.materialCentreId = data.materialCentreId || voucher.materialCentreId;
+    voucher.lineItems = data.lineItems;
+    voucher.narration = data.narration ?? voucher.narration;
+    voucher.bomId = data.bomId || voucher.bomId;
+    voucher.fromMaterialCentreId = data.fromMaterialCentreId || voucher.fromMaterialCentreId;
+    voucher.toMaterialCentreId = data.toMaterialCentreId || voucher.toMaterialCentreId;
+    voucher.subtotal = subtotal;
+    voucher.totalDiscount = totalDiscount;
+    voucher.totalTax = totalTax;
+    voucher.grandTotal = grandTotal;
+    voucher.updatedBy = userId;
+
+    await voucher.save(session ? { session } : {});
+
+    // Get new entries from handler
+    const inventoryEntries = handler.getInventoryEntries
+      ? handler.getInventoryEntries(voucher)
+      : [];
+    const journalEntries = handler.getJournalEntries
+      ? handler.getJournalEntries(voucher)
+      : [];
+
+    // Post new inventory entries
+    if (inventoryEntries.length > 0) {
+      await inventoryEngine.postEntries(inventoryEntries, session);
+    }
+
+    // Resolve account codes and post new journal entries
+    if (journalEntries.length > 0) {
+      await resolveAccountIds(journalEntries, businessId);
+      await accountingEngine.postEntries(journalEntries, session);
+    }
+
+    if (session) await session.commitTransaction();
+
+    emitAudit({
+      businessId,
+      userId,
+      action: 'update',
+      module: 'voucher',
+      documentId: voucher._id,
+      documentType: voucher.voucherType,
+      before,
+      after: voucher.toObject(),
+      req,
+    });
+
+    return voucher;
+  } catch (err) {
+    if (session) await session.abortTransaction();
+    throw err;
+  } finally {
+    if (session) session.endSession();
+  }
+}
+
+export default { registerHandler, getHandler, create, cancel, update };

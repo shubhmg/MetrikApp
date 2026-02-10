@@ -3,7 +3,6 @@ import { Modal, Stack, SimpleGrid, Text, Badge, Table, Group, Button, Textarea, 
 import { notifications } from '@mantine/notifications';
 import api from '../services/api.js';
 
-const STATUS_COLORS = { draft: 'yellow', posted: 'green', cancelled: 'red' };
 
 function fmtDate(d) {
   return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -16,17 +15,6 @@ function fmtCurrency(n) {
 export default function ProductionDetailModal({ voucher, onClose, onUpdate }) {
   const [cancelModal, setCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
-
-  async function handlePost() {
-    try {
-      await api.post(`/vouchers/${voucher._id}/post`);
-      notifications.show({ title: 'Production posted', color: 'green' });
-      onUpdate();
-      onClose();
-    } catch (err) {
-      notifications.show({ title: 'Post failed', message: err.response?.data?.message, color: 'red' });
-    }
-  }
 
   async function handleCancel() {
     if (!cancelReason.trim()) return;
@@ -55,10 +43,12 @@ export default function ProductionDetailModal({ voucher, onClose, onUpdate }) {
         <Stack>
           <SimpleGrid cols={2}>
             <Text size="sm"><strong>Date:</strong> {fmtDate(voucher.date)}</Text>
-            <Text size="sm">
-              <strong>Status:</strong>{' '}
-              <Badge color={STATUS_COLORS[voucher.status]} variant="light" size="sm">{voucher.status}</Badge>
-            </Text>
+            {voucher.status === 'cancelled' && (
+              <Text size="sm">
+                <strong>Status:</strong>{' '}
+                <Badge color="red" variant="light" size="sm">cancelled</Badge>
+              </Text>
+            )}
             <Text size="sm"><strong>MC:</strong> {voucher.materialCentreId?.name || '-'}</Text>
             <Text size="sm"><strong>FY:</strong> {voucher.financialYear}</Text>
           </SimpleGrid>
@@ -121,7 +111,6 @@ export default function ProductionDetailModal({ voucher, onClose, onUpdate }) {
           </Card>
 
           <Group justify="flex-end">
-            {voucher.status === 'draft' && <Button onClick={handlePost}>Post Production</Button>}
             {voucher.status === 'posted' && (
               <Button color="red" onClick={() => { setCancelModal(true); setCancelReason(''); }}>
                 Cancel Production

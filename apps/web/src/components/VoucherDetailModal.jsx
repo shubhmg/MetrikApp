@@ -1,9 +1,9 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Modal, Stack, SimpleGrid, Text, Badge, Table, Group, Button, Textarea } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import api from '../services/api.js';
 
-const STATUS_COLORS = { draft: 'yellow', posted: 'green', cancelled: 'red' };
 
 function fmtDate(d) {
   return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -17,20 +17,14 @@ function fmtCurrency(n) {
   return (n || 0).toLocaleString('en-IN', { style: 'currency', currency: 'INR' });
 }
 
+const ORDER_TYPES = ['sales_order', 'purchase_order'];
+
 export default function VoucherDetailModal({ voucher, onClose, onUpdate }) {
+  const navigate = useNavigate();
   const [cancelModal, setCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
-
-  async function handlePost() {
-    try {
-      await api.post(`/vouchers/${voucher._id}/post`);
-      notifications.show({ title: 'Voucher posted', color: 'green' });
-      onUpdate();
-      onClose();
-    } catch (err) {
-      notifications.show({ title: 'Post failed', message: err.response?.data?.message, color: 'red' });
-    }
-  }
+  const [converting, setConverting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   async function handleCancel() {
     if (!cancelReason.trim()) return;
@@ -46,6 +40,36 @@ export default function VoucherDetailModal({ voucher, onClose, onUpdate }) {
     }
   }
 
+  async function handleDelete() {
+    if (!confirm('Delete this order? This cannot be undone.')) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/vouchers/${voucher._id}`);
+      notifications.show({ title: 'Order deleted', color: 'green' });
+      onUpdate();
+      onClose();
+    } catch (err) {
+      notifications.show({ title: 'Delete failed', message: err.response?.data?.message, color: 'red' });
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  async function handleConvertToInvoice() {
+    setConverting(true);
+    try {
+      const res = await api.post(`/vouchers/${voucher._id}/convert-to-invoice`);
+      const inv = res.data.data.voucher;
+      notifications.show({ title: 'Invoice created', message: inv.voucherNumber, color: 'green' });
+      onUpdate();
+      onClose();
+    } catch (err) {
+      notifications.show({ title: 'Conversion failed', message: err.response?.data?.message, color: 'red' });
+    } finally {
+      setConverting(false);
+    }
+  }
+
   if (!voucher) return null;
 
   const isAccountBased = ['payment', 'receipt', 'journal', 'contra'].includes(voucher.voucherType);
@@ -57,7 +81,7 @@ export default function VoucherDetailModal({ voucher, onClose, onUpdate }) {
             <SimpleGrid cols={2}>
               <Text size="sm"><strong>Type:</strong> {fmtType(voucher.voucherType)}</Text>
               <Text size="sm"><strong>Date:</strong> {fmtDate(voucher.date)}</Text>
-              <Text size="sm"><strong>Status:</strong> <Badge color={STATUS_COLORS[voucher.status]} variant="light" size="sm">{voucher.status}</Badge></Text>
+              {voucher.status === 'cancelled' && <Text size="sm"><strong>Status:</strong> <Badge color="red" variant="light" size="sm">cancelled</Badge></Text>}
               <Text size="sm"><strong>Party:</strong> {voucher.partyId?.name || '-'}</Text>
               <Text size="sm"><strong>MC:</strong> {voucher.materialCentreId?.name || '-'}</Text>
               <Text size="sm"><strong>FY:</strong> {voucher.financialYear}</Text>
@@ -117,9 +141,35 @@ export default function VoucherDetailModal({ voucher, onClose, onUpdate }) {
               <Text fw={700} size="lg">Total: {fmtCurrency(voucher.grandTotal)}</Text>
             </Group>
 
+            {voucher.linkedVouchers?.length > 0 && (
+              <>
+                <Text fw={600} size="sm">Linked Vouchers</Text>
+                <Group gap="xs">
+                  {voucher.linkedVouchers.map((lv, i) => (
+                    <Badge key={i} variant="outline" color="blue" size="lg">
+                      {lv.voucherId?.voucherNumber || lv.voucherId} — {lv.relationship?.replace(/_/g, ' ')}
+                    </Badge>
+                  ))}
+                </Group>
+              </>
+            )}
+
             <Group justify="flex-end">
-              {voucher.status === 'draft' && <Button onClick={handlePost}>Post Voucher</Button>}
-              {voucher.status === 'posted' && <Button color="red" onClick={() => { setCancelModal(true); setCancelReason(''); }}>Cancel Voucher</Button>}
+              {voucher.status === 'posted' && (
+                <Button variant="light" onClick={() => { navigate(`/vouchers/${voucher._id}/edit`); onClose(); }}>
+                  Edit
+                </Button>
+              )}
+              {ORDER_TYPES.includes(voucher.voucherType) ? (
+                <>
+                  <Button color="red" loading={deleting} onClick={handleDelete}>Delete</Button>
+                  <Button color="teal" loading={converting} onClick={handleConvertToInvoice}>
+                    Convert to Invoice
+                  </Button>
+                </>
+              ) : (
+                voucher.status === 'posted' && <Button color="red" onClick={() => { setCancelModal(true); setCancelReason(''); }}>Cancel Voucher</Button>
+              )}
             </Group>
         </Stack>
       </Modal>

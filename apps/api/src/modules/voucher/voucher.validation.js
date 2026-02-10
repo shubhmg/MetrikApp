@@ -40,8 +40,28 @@ export const createVoucherSchema = {
   }),
 };
 
-export const postVoucherSchema = {
+export const updateVoucherSchema = {
   params: Joi.object({ id: Joi.string().required() }),
+  body: Joi.object({
+    voucherType: Joi.forbidden(),
+    date: Joi.date().required(),
+    partyId: Joi.string().allow(null).optional(),
+    materialCentreId: Joi.string().allow(null).optional(),
+    lineItems: Joi.array().items(lineItemSchema).min(1).required(),
+    bomId: Joi.string().allow(null).optional(),
+    fromMaterialCentreId: Joi.string().allow(null).optional(),
+    toMaterialCentreId: Joi.string().allow(null).optional(),
+    linkedVouchers: Joi.array()
+      .items(
+        Joi.object({
+          voucherId: Joi.string().required(),
+          voucherType: Joi.string().valid(...VOUCHER_TYPE_VALUES).optional(),
+          relationship: Joi.string().optional(),
+        })
+      )
+      .optional(),
+    narration: Joi.string().max(500).allow('').optional(),
+  }),
 };
 
 export const cancelVoucherSchema = {
@@ -51,11 +71,16 @@ export const cancelVoucherSchema = {
   }),
 };
 
+export const convertToInvoiceSchema = {
+  params: Joi.object({ id: Joi.string().required() }),
+};
+
 export const listVoucherSchema = {
   query: Joi.object({
     voucherType: Joi.string().valid(...VOUCHER_TYPE_VALUES).optional(),
-    status: Joi.string().valid('draft', 'posted', 'cancelled').optional(),
+    status: Joi.string().valid('posted', 'cancelled').optional(),
     partyId: Joi.string().optional(),
+    materialCentreId: Joi.string().optional(),
     fromDate: Joi.date().optional(),
     toDate: Joi.date().optional(),
     page: Joi.number().integer().min(1).default(1),

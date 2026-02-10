@@ -37,7 +37,6 @@ export const VOUCHER_PREFIX = {
 };
 
 export const VOUCHER_STATUS = {
-  DRAFT: 'draft',
   POSTED: 'posted',
   CANCELLED: 'cancelled',
 };

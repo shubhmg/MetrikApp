@@ -5,7 +5,6 @@ import PageHeader from '../components/PageHeader.jsx';
 import ProductionDetailModal from '../components/ProductionDetailModal.jsx';
 import api from '../services/api.js';
 
-const STATUS_COLORS = { draft: 'yellow', posted: 'green', cancelled: 'red' };
 
 function fmtDate(d) {
   return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -41,7 +40,7 @@ function ProductionGroup({ date, vouchers, onClick }) {
                     <Text size="sm" fw={500}>{output?.itemId?.name || output?.itemName || 'Unknown Output'}</Text>
                     <Group gap="xs">
                       <Text size="xs" c="dimmed" ff="monospace">{v.voucherNumber}</Text>
-                      <Badge size="xs" variant="dot" color={STATUS_COLORS[v.status]}>{v.status}</Badge>
+                      {v.status === 'cancelled' && <Badge size="xs" variant="dot" color="red">cancelled</Badge>}
                     </Group>
                   </Box>
                   <Box style={{ textAlign: 'right' }}>
@@ -122,7 +121,6 @@ export default function Productions() {
           value={statusFilter}
           onChange={(val) => { setStatusFilter(val); setPage(1); }}
           data={[
-            { value: 'draft', label: 'Draft' },
             { value: 'posted', label: 'Posted' },
             { value: 'cancelled', label: 'Cancelled' },
           ]}

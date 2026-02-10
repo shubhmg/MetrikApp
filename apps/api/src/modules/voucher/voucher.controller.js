@@ -16,8 +16,14 @@ export const getById = catchAsync(async (req, res) => {
   res.json({ success: true, data: { voucher } });
 });
 
-export const post = catchAsync(async (req, res) => {
-  const voucher = await voucherService.postVoucher(req.params.id, req.businessId, req.user._id, req);
+export const update = catchAsync(async (req, res) => {
+  const voucher = await voucherService.updateVoucher(
+    req.params.id,
+    req.body,
+    req.businessId,
+    req.user._id,
+    req
+  );
   res.json({ success: true, data: { voucher } });
 });
 
@@ -30,6 +36,16 @@ export const cancel = catchAsync(async (req, res) => {
     req
   );
   res.json({ success: true, data: { voucher } });
+});
+
+export const convertToInvoice = catchAsync(async (req, res) => {
+  const voucher = await voucherService.convertOrderToInvoice(req.params.id, req.businessId, req.user._id);
+  res.status(201).json({ success: true, data: { voucher } });
+});
+
+export const remove = catchAsync(async (req, res) => {
+  await voucherService.deleteVoucher(req.params.id, req.businessId, req.user._id);
+  res.json({ success: true, data: null });
 });
 
 export const getStockSummary = catchAsync(async (req, res) => {

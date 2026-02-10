@@ -50,7 +50,7 @@ export default function Login() {
   };
 
   return (
-    <Center mih="100vh" bg="gray.0">
+    <Center mih="100vh">
       <Box w={400} mx="auto">
         <Paper withBorder shadow="md" p="xl" radius="md">
           <Stack>

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Select,
   TextInput,
@@ -12,6 +13,7 @@ import {
   ActionIcon,
   Alert,
   Text,
+  Card,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
@@ -19,7 +21,6 @@ import { IconPencil, IconTrash } from '@tabler/icons-react';
 import PageHeader from '../components/PageHeader.jsx';
 import DataTable from '../components/DataTable.jsx';
 import ConfirmDelete from '../components/ConfirmDelete.jsx';
-import PartyLedgerModal from '../components/PartyLedgerModal.jsx';
 import api from '../services/api.js';
 
 const TYPE_OPTIONS = [
@@ -41,7 +42,7 @@ export default function Parties() {
   const [error, setError] = useState('');
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
-  const [ledgerParty, setLedgerParty] = useState(null);
+  const navigate = useNavigate();
 
   const form = useForm({ initialValues: EMPTY_FORM });
 
@@ -115,21 +116,21 @@ export default function Parties() {
     : parties;
 
   const columns = [
-    { 
-      key: 'name', 
-      label: 'Name', 
+    {
+      key: 'name',
+      label: 'Name',
       render: (r) => (
-        <Text 
-          c="blue" 
-          style={{ cursor: 'pointer', textDecoration: 'underline' }} 
+        <Text
+          c="blue"
+          style={{ cursor: 'pointer', textDecoration: 'underline' }}
           onClick={(e) => {
             e.stopPropagation();
-            setLedgerParty(r);
+            navigate(`/parties/${r._id}/ledger`);
           }}
         >
           {r.name}
         </Text>
-      ) 
+      )
     },
     {
       key: 'type', label: 'Type',
@@ -171,7 +172,42 @@ export default function Parties() {
         <TextInput placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} w={200} />
       </PageHeader>
 
-      <DataTable columns={columns} data={filtered} loading={loading} emptyMessage="No parties yet" />
+      <DataTable
+        columns={columns}
+        data={filtered}
+        loading={loading}
+        emptyMessage="No parties yet"
+        mobileRender={(r) => (
+          <Card key={r._id} withBorder padding="sm">
+            <Group justify="space-between" wrap="nowrap">
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <Text
+                  fw={600}
+                  c="blue"
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => navigate(`/parties/${r._id}/ledger`)}
+                  truncate
+                >
+                  {r.name}
+                </Text>
+                <Group gap={4} mt={4}>
+                  {r.type.map((t) => (
+                    <Badge key={t} variant="light" size="sm" color={t === 'customer' ? 'blue' : t === 'vendor' ? 'orange' : 'grape'}>
+                      {t}
+                    </Badge>
+                  ))}
+                </Group>
+                {r.phone && <Text size="xs" c="dimmed" mt={2}>{r.phone}</Text>}
+                {r.gstin && <Text size="xs" c="dimmed" ff="monospace" mt={2}>{r.gstin}</Text>}
+              </div>
+              <Group gap={4}>
+                <ActionIcon variant="subtle" onClick={(e) => { e.stopPropagation(); openEdit(r); }}><IconPencil size={16} /></ActionIcon>
+                <ActionIcon variant="subtle" color="red" onClick={(e) => { e.stopPropagation(); setDeleteTarget(r); }}><IconTrash size={16} /></ActionIcon>
+              </Group>
+            </Group>
+          </Card>
+        )}
+      />
 
       <Modal
         opened={modalOpen}
@@ -202,12 +238,6 @@ export default function Parties() {
         onConfirm={handleDelete}
         loading={deleting}
         name={deleteTarget?.name}
-      />
-
-      <PartyLedgerModal 
-        opened={!!ledgerParty} 
-        onClose={() => setLedgerParty(null)} 
-        party={ledgerParty}
       />
     </div>
   );

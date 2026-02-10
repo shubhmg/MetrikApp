@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useParams } from 'react-router-dom';
 import {
   Title,
   Select,
@@ -20,6 +20,7 @@ import {
   Badge,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
+import { DateInput } from '@mantine/dates';
 import { IconPlus, IconTrash, IconArrowLeft } from '@tabler/icons-react';
 import api from '../services/api.js';
 
@@ -67,16 +68,16 @@ const ACCOUNT_TYPES = ['payment', 'receipt', 'journal', 'contra'];
 const MC_TYPES = ['sales_invoice', 'purchase_invoice', 'sales_return', 'purchase_return', 'grn', 'delivery_note', 'production', 'physical_stock'];
 const TRANSFER_TYPE = 'stock_transfer';
 
-// Voucher types that should be immediately posted
-const AUTO_POST_VOUCHER_TYPES = ['sales_invoice', 'receipt'];
-
 const EMPTY_ITEM_LINE = { itemId: '', quantity: 1, rate: 0, discount: 0, gstRate: 18 };
 const EMPTY_ACCOUNT_LINE = { accountId: '', debit: 0, credit: 0, narration: '' };
 
 export default function VoucherCreate() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { id: editId } = useParams();
+  const isEditMode = !!editId;
   const [voucherType, setVoucherType] = useState(searchParams.get('type') || null);
+  const [voucherDate, setVoucherDate] = useState(new Date());
   const [partyId, setPartyId] = useState(null);
   const [materialCentreId, setMaterialCentreId] = useState(null);
   const [fromMaterialCentreId, setFromMaterialCentreId] = useState(null);
@@ -85,6 +86,7 @@ export default function VoucherCreate() {
   const [itemLines, setItemLines] = useState([{ ...EMPTY_ITEM_LINE }]);
   const [accountLines, setAccountLines] = useState([{ ...EMPTY_ACCOUNT_LINE }]);
   const [saving, setSaving] = useState(false);
+  const [editLoading, setEditLoading] = useState(false);
 
   // BOM state for production vouchers
   const [activeBom, setActiveBom] = useState(null);
@@ -117,13 +119,55 @@ export default function VoucherCreate() {
     loadRef();
   }, []);
 
+  // Load voucher data when editing
+  useEffect(() => {
+    if (!editId || loadingRef) return;
+    setEditLoading(true);
+    api.get(`/vouchers/${editId}`)
+      .then(({ data }) => {
+        const v = data.data.voucher;
+        setVoucherType(v.voucherType);
+        setVoucherDate(new Date(v.date));
+        setPartyId(v.partyId?._id || v.partyId || null);
+        setMaterialCentreId(v.materialCentreId?._id || v.materialCentreId || null);
+        setFromMaterialCentreId(v.fromMaterialCentreId || null);
+        setToMaterialCentreId(v.toMaterialCentreId || null);
+        setNarration(v.narration || '');
+        setSelectedBomId(v.bomId?._id || v.bomId || null);
+
+        const isItemType = ITEM_TYPES.includes(v.voucherType);
+        const isAcctType = ACCOUNT_TYPES.includes(v.voucherType);
+
+        if (isItemType && v.lineItems?.length) {
+          setItemLines(v.lineItems.map((li) => ({
+            itemId: li.itemId?._id || li.itemId || '',
+            quantity: li.quantity || 1,
+            rate: li.rate || 0,
+            discount: li.discount || 0,
+            gstRate: li.gstRate || 18,
+          })));
+        }
+        if (isAcctType && v.lineItems?.length) {
+          setAccountLines(v.lineItems.map((li) => ({
+            accountId: li.accountId?._id || li.accountId || '',
+            debit: li.debit || 0,
+            credit: li.credit || 0,
+            narration: li.narration || '',
+          })));
+        }
+      })
+      .catch(() => {
+        notifications.show({ title: 'Error', message: 'Failed to load voucher for editing', color: 'red' });
+      })
+      .finally(() => setEditLoading(false));
+  }, [editId, loadingRef]);
+
   const isItemBased = ITEM_TYPES.includes(voucherType);
   const isAccountBased = ACCOUNT_TYPES.includes(voucherType);
   const needsParty = PARTY_TYPES.includes(voucherType);
   const needsMc = MC_TYPES.includes(voucherType);
   const isTransfer = voucherType === TRANSFER_TYPE;
-  const shouldAutoPost = AUTO_POST_VOUCHER_TYPES.includes(voucherType);
-  
+
   // Simple mode for Receipt/Payment with Party selected
   const isSimpleMode = (voucherType === 'receipt' || voucherType === 'payment') && partyId;
 
@@ -236,7 +280,7 @@ export default function VoucherCreate() {
     return { totalDebit, totalCredit, balanced: Math.abs(totalDebit - totalCredit) < 0.01 };
   }, [accountLines]);
 
-  async function handleSave(postImmediately = false) {
+  async function handleSave() {
     if (!voucherType) {
       notifications.show({ title: 'Select type', message: 'Please select a voucher type', color: 'red' });
       return;
@@ -245,10 +289,12 @@ export default function VoucherCreate() {
     setSaving(true);
     try {
       const payload = {
-        voucherType,
-        date: new Date().toISOString(),
+        date: voucherDate.toISOString(),
         narration,
       };
+
+      // Only include voucherType on create
+      if (!isEditMode) payload.voucherType = voucherType;
 
       if (needsParty && partyId) payload.partyId = partyId;
       if (needsMc && materialCentreId) payload.materialCentreId = materialCentreId;
@@ -279,30 +325,27 @@ export default function VoucherCreate() {
           }));
       }
 
-      const createRes = await api.post('/vouchers', payload);
-      const newVoucherId = createRes.data.data.voucher._id;
-
-      if (postImmediately) {
-        await api.post(`/vouchers/${newVoucherId}/post`);
-        notifications.show({ title: 'Voucher created and posted', color: 'green' });
+      if (isEditMode) {
+        await api.put(`/vouchers/${editId}`, payload);
+        notifications.show({ title: 'Voucher updated', color: 'green' });
       } else {
-        notifications.show({ title: 'Voucher created', message: 'Saved as draft', color: 'green' });
+        await api.post('/vouchers', payload);
+        notifications.show({ title: 'Voucher saved', color: 'green' });
       }
-      
-      navigate(-1); // Go back to previous page
+      navigate(-1);
     } catch (err) {
-      notifications.show({ title: 'Error', message: err.response?.data?.message || 'Failed to create', color: 'red' });
+      notifications.show({ title: 'Error', message: err.response?.data?.message || (isEditMode ? 'Failed to update' : 'Failed to create'), color: 'red' });
     }
     setSaving(false);
   }
 
-  if (loadingRef) return <Center py="xl"><Loader /></Center>;
+  if (loadingRef || editLoading) return <Center py="xl"><Loader /></Center>;
 
   return (
     <div>
       <Group mb="lg">
         <ActionIcon variant="subtle" onClick={() => navigate(-1)}><IconArrowLeft size={20} /></ActionIcon>
-        <Title order={2}>{isProduction ? 'New Production' : 'New Voucher'}</Title>
+        <Title order={2}>{isEditMode ? (isProduction ? 'Edit Production' : 'Edit Voucher') : (isProduction ? 'New Production' : 'New Voucher')}</Title>
       </Group>
 
       <Stack>
@@ -315,6 +358,15 @@ export default function VoucherCreate() {
             onChange={setVoucherType}
             searchable
             required
+            disabled={isEditMode}
+          />
+
+          <DateInput
+            label="Date"
+            value={voucherDate}
+            onChange={setVoucherDate}
+            required
+            valueFormat="DD MMM YYYY"
           />
 
           {needsParty && (
@@ -655,15 +707,9 @@ export default function VoucherCreate() {
 
         <Group justify="flex-end">
           <Button variant="default" onClick={() => navigate(-1)}>Cancel</Button>
-          {shouldAutoPost ? (
-            <Button onClick={() => handleSave(true)} loading={saving} disabled={!voucherType}>
-              Save & Post
-            </Button>
-          ) : (
-            <Button onClick={() => handleSave(false)} loading={saving} disabled={!voucherType}>
-              Save as Draft
-            </Button>
-          )}
+          <Button onClick={handleSave} loading={saving} disabled={!voucherType}>
+            {isEditMode ? 'Update' : 'Save'}
+          </Button>
         </Group>
       </Stack>
     </div>
