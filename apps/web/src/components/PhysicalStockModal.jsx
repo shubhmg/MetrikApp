@@ -10,6 +10,7 @@ export default function PhysicalStockModal({ opened, onClose }) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [stockData, setStockData] = useState({}); // itemId -> systemQty
+  const [selectOpen, setSelectOpen] = useState(false);
 
   useEffect(() => {
     if (opened) {
@@ -107,9 +108,15 @@ export default function PhysicalStockModal({ opened, onClose }) {
         onChange={setSelectedMc} 
         mb="md"
         placeholder="Select Material Centre"
+        comboboxProps={{
+          withinPortal: true,
+          position: 'bottom-start',
+          onDropdownOpen: () => setSelectOpen(true),
+          onDropdownClose: () => setSelectOpen(false),
+        }}
       />
 
-      {selectedMc && (
+      {selectedMc && !selectOpen && (
         <>
           {loading ? <Loader /> : (
             <div style={{ maxHeight: '60vh', overflowY: 'auto' }}>

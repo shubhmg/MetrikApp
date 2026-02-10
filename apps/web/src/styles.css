@@ -1,0 +1,144 @@
+:root {
+  --app-bg: #f3f4f6;
+  --app-surface: #ffffff;
+  --app-surface-elevated: #f8fafc;
+  --app-border: #e5e7eb;
+  --app-text: #0f172a;
+  --app-muted: #64748b;
+  --app-header-height: 56px;
+  --app-tabbar-height: 0px;
+  --app-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+}
+
+[data-mantine-color-scheme='dark'] {
+  --app-bg: #121212;
+  --app-surface: #1e1e1e;
+  --app-surface-elevated: #242424;
+  --app-border: #2a2a2a;
+  --app-text: #f1f1f1;
+  --app-muted: #b3b3b3;
+  --app-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+  --mantine-color-body: #121212;
+  --mantine-color-default: #1e1e1e;
+  --mantine-color-default-border: #2a2a2a;
+  --mantine-color-dark-9: #0f0f0f;
+  --mantine-color-dark-8: #1a1a1a;
+  --mantine-color-dark-7: #1e1e1e;
+  --mantine-color-dark-6: #242424;
+  --mantine-color-dark-5: #2a2a2a;
+  --mantine-color-teal-0: #e6fcf5;
+  --mantine-color-teal-1: #d1fae5;
+  --mantine-color-teal-2: #a7f3d0;
+  --mantine-color-teal-3: #6ee7b7;
+  --mantine-color-teal-4: #34d399;
+  --mantine-color-teal-5: #22c55e;
+  --mantine-color-teal-6: #22c55e;
+  --mantine-color-teal-7: #16a34a;
+  --mantine-color-teal-8: #15803d;
+  --mantine-color-teal-9: #166534;
+}
+
+@media (max-width: 48em) {
+  :root {
+    --app-tabbar-height: 60px;
+  }
+  :where(.mantine-Input-input),
+  :where(.mantine-Select-input),
+  :where(.mantine-Textarea-input) {
+    border-radius: var(--mantine-radius-sm) !important;
+  }
+  html {
+    font-size: 15px;
+  }
+  body {
+    font-size: 13px;
+  }
+  :where(.mantine-Text-root) {
+    font-size: 1.05rem;
+  }
+  :where(.mantine-Title-root) {
+    font-size: 1.15rem;
+  }
+}
+
+body {
+  background: radial-gradient(1200px 600px at 10% -20%, rgba(34, 197, 94, 0.08), transparent 60%),
+    var(--app-bg);
+  color: var(--app-text);
+  font-weight: 600;
+}
+
+[data-mantine-color-scheme='dark'] body {
+  background: var(--app-bg);
+}
+
+:where(.mantine-Text-root) {
+  font-weight: 600;
+}
+
+:where(.mantine-Text-root[data-dimmed='true']) {
+  font-weight: 600;
+}
+
+:where(.mantine-InputWrapper-label) {
+  display: block;
+  margin-bottom: 6px;
+}
+
+:where(.ledger-accent-row) {
+  background-color: var(--mantine-color-teal-0);
+}
+
+[data-mantine-color-scheme='dark'] :where(.ledger-accent-row) {
+  background-color: #1e293b;
+}
+
+[data-mantine-color-scheme='dark'] :where(.mantine-Card-root),
+[data-mantine-color-scheme='dark'] :where(.mantine-Paper-root),
+[data-mantine-color-scheme='dark'] :where(.mantine-Drawer-content),
+[data-mantine-color-scheme='dark'] :where(.mantine-Modal-content) {
+  background-color: var(--app-surface) !important;
+}
+
+:where(.mantine-AppShell-main) {
+  background: transparent;
+}
+
+:where(.mantine-Card-root),
+:where(.mantine-Paper-root),
+:where(.mantine-Modal-content) {
+  background-color: var(--app-surface);
+  border-color: var(--app-border);
+}
+
+:where(.mantine-Card-root),
+:where(.mantine-Paper-root) {
+  border: none !important;
+  outline: none !important;
+  box-shadow: var(--app-shadow);
+}
+
+:where(.mantine-Card-root),
+:where(.mantine-Paper-root) {
+  box-shadow: var(--app-shadow);
+}
+
+[data-mantine-color-scheme='dark'] :where(.mantine-Card-root),
+[data-mantine-color-scheme='dark'] :where(.mantine-Paper-root) {
+  box-shadow: none;
+}
+
+.page-root {
+  min-height: calc(100dvh - var(--app-header-height) - var(--app-tabbar-height));
+}
+
+.app-header {
+  backdrop-filter: saturate(160%) blur(12px);
+  background-color: color-mix(in srgb, var(--app-surface) 88%, transparent);
+  border-bottom: 1px solid var(--app-border);
+}
+
+.app-tabbar {
+  backdrop-filter: saturate(160%) blur(14px);
+  background-color: color-mix(in srgb, var(--app-surface) 92%, transparent);
+}

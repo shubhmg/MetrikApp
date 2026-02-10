@@ -17,11 +17,13 @@ import {
   Card,
   Text,
 } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
-import { IconPencil, IconTrash, IconPlus } from '@tabler/icons-react';
+import { IconPencil, IconTrash, IconPlus, IconChartBar } from '@tabler/icons-react';
 import DataTable from '../components/DataTable.jsx';
 import ConfirmDelete from '../components/ConfirmDelete.jsx';
+import ItemSalesGraphModal from '../components/ItemSalesGraphModal.jsx';
 import api from '../services/api.js';
 
 const GROUP_TYPES = [
@@ -45,6 +47,8 @@ export default function Items() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteType, setDeleteType] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const isMobile = useMediaQuery('(max-width: 48em)');
+  const [graphsOpen, setGraphsOpen] = useState(false);
 
   const itemForm = useForm({
     initialValues: { name: '', sku: '', itemGroupId: '', unit: 'pcs', hsnCode: '', gstRate: 18, costingMethod: 'weighted_average', reorderLevel: 0 },
@@ -195,17 +199,28 @@ export default function Items() {
 
   return (
     <div>
-      <Title order={2} mb="lg">Items</Title>
+      <Title order={isMobile ? 3 : 2} mb="lg">Items</Title>
 
       <Tabs defaultValue="items">
-        <Tabs.List mb="md">
+        <Tabs.List mb="md" grow={isMobile}>
           <Tabs.Tab value="items">Items ({items.length})</Tabs.Tab>
           <Tabs.Tab value="groups">Groups ({groups.length})</Tabs.Tab>
         </Tabs.List>
 
         <Tabs.Panel value="items">
           <Group justify="flex-end" mb="sm">
-            <Button leftSection={<IconPlus size={16} />} onClick={openItemCreate}>Add Item</Button>
+            <Group gap="xs" grow={isMobile}>
+              <Button leftSection={<IconPlus size={16} />} onClick={openItemCreate} fullWidth={isMobile}>Add Item</Button>
+              <ActionIcon
+                variant="light"
+                color="teal"
+                size="lg"
+                onClick={() => setGraphsOpen(true)}
+                aria-label="Sales graphs"
+              >
+                <IconChartBar size={18} />
+              </ActionIcon>
+            </Group>
           </Group>
           <DataTable
             columns={itemColumns}
@@ -235,7 +250,7 @@ export default function Items() {
 
         <Tabs.Panel value="groups">
           <Group justify="flex-end" mb="sm">
-            <Button leftSection={<IconPlus size={16} />} onClick={openGroupCreate}>Add Group</Button>
+            <Button leftSection={<IconPlus size={16} />} onClick={openGroupCreate} fullWidth={isMobile}>Add Group</Button>
           </Group>
           <DataTable
             columns={groupColumns}
@@ -313,6 +328,12 @@ export default function Items() {
         onConfirm={handleDelete}
         loading={deleting}
         name={deleteTarget?.name || deleteTarget?.code}
+      />
+
+      <ItemSalesGraphModal
+        opened={graphsOpen}
+        onClose={() => setGraphsOpen(false)}
+        items={items}
       />
     </div>
   );

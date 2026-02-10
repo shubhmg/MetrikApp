@@ -14,6 +14,7 @@ for (const key of required) {
 }
 
 const env = {
+  host: process.env.HOST || '0.0.0.0',
   port: parseInt(process.env.PORT, 10) || 4000,
   nodeEnv: process.env.NODE_ENV || 'development',
   mongodbUri: process.env.MONGODB_URI,

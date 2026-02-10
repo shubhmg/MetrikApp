@@ -33,6 +33,7 @@ import {
   IconSun,
   IconMoon,
   IconReceipt,
+  IconPlus,
 } from '@tabler/icons-react';
 import { useAuth } from '../../hooks/useAuth.js';
 
@@ -75,10 +76,10 @@ for (const entry of NAV_ITEMS) {
 // Bottom tab bar tabs
 const BOTTOM_TABS = [
   { path: '/', label: 'Home', icon: IconLayoutDashboard },
-  { path: '/sales-invoices', label: 'Sales', icon: IconFileInvoice },
-  { path: '/purchase-orders', label: 'Purchases', icon: IconClipboardCheck },
+  { path: '/sales-orders', label: 'Orders', icon: IconClipboardList },
+  { path: '__more__', label: 'More', icon: IconPlus },
+  { path: '/parties', label: 'Parties', icon: IconUsers },
   { path: '/inventory', label: 'Inventory', icon: IconPackage },
-  { path: '__more__', label: 'More', icon: IconDots },
 ];
 
 // "More" drawer items (everything not in bottom tabs)
@@ -111,13 +112,19 @@ export default function AppShell() {
   const navigate = useNavigate();
   const { colorScheme, toggleColorScheme } = useMantineColorScheme();
   const isMobile = useMediaQuery('(max-width: 48em)');
+  const hideBottomBar = isMobile && (
+    location.pathname.startsWith('/vouchers/new') ||
+    location.pathname.includes('/edit') ||
+    location.pathname.includes('/ledger') ||
+    location.pathname.startsWith('/vouchers/')
+  );
 
   function handleBottomTab(tab) {
     if (tab.path === '__more__') {
       setMoreOpen(true);
-    } else {
-      navigate(tab.path);
+      return;
     }
+    navigate(tab.path);
   }
 
   function handleMoreNav(path) {
@@ -133,13 +140,13 @@ export default function AppShell() {
         padding="md"
         style={isMobile ? { '--app-shell-padding': 'var(--mantine-spacing-sm)' } : undefined}
       >
-        <MantineAppShell.Header>
+        <MantineAppShell.Header className="app-header">
           <Group h="100%" px="md" justify="space-between">
             <Group>
               {!isMobile && (
                 <Burger opened={sidebarOpened} onClick={() => setSidebarOpened(!sidebarOpened)} hiddenFrom="sm" size="sm" />
               )}
-              <Text fw={700} size="lg" c="blue">Natraj ERP</Text>
+              <Text fw={700} size="lg" c="teal">Metrik</Text>
             </Group>
             <Group>
               {!isMobile && (
@@ -152,8 +159,12 @@ export default function AppShell() {
                   {colorScheme === 'dark' ? <IconSun size={20} /> : <IconMoon size={20} />}
                 </ActionIcon>
               )}
-              <Text size="sm" c="dimmed">{user?.name}</Text>
-              <Button variant="subtle" size="xs" onClick={logout}>Logout</Button>
+              {!isMobile && (
+                <>
+                  <Text size="sm" c="dimmed">{user?.name}</Text>
+                  <Button variant="subtle" size="xs" onClick={logout}>Logout</Button>
+                </>
+              )}
             </Group>
           </Group>
         </MantineAppShell.Header>
@@ -203,6 +214,7 @@ export default function AppShell() {
         )}
 
         <MantineAppShell.Main
+          className="page-root"
           style={isMobile ? { paddingBottom: 76 } : undefined}
         >
           <Outlet />
@@ -210,8 +222,9 @@ export default function AppShell() {
       </MantineAppShell>
 
       {/* Mobile Bottom Tab Bar */}
-      {isMobile && (
+      {isMobile && !hideBottomBar && (
         <Box
+          className="app-tabbar"
           style={{
             position: 'fixed',
             bottom: 0,
@@ -229,6 +242,7 @@ export default function AppShell() {
         >
           {BOTTOM_TABS.map((tab) => {
             const active = tab.path !== '__more__' && isActive(tab.path, location.pathname);
+            const isMore = tab.path === '__more__';
             return (
               <UnstyledButton
                 key={tab.path}
@@ -239,21 +253,36 @@ export default function AppShell() {
                   alignItems: 'center',
                   gap: 2,
                   flex: 1,
-                  padding: '6px 0',
+                  padding: isMore ? 0 : '8px 0',
+                  height: isMore ? 60 : 'auto',
+                  justifyContent: 'center',
                 }}
               >
-                <tab.icon
-                  size={22}
-                  stroke={1.5}
-                  color={active ? 'var(--mantine-color-blue-6)' : 'var(--mantine-color-dimmed)'}
-                />
+                {isMore ? (
+                  <ActionIcon
+                    size={44}
+                    radius="xl"
+                    variant="filled"
+                    color="teal"
+                    style={{ boxShadow: 'none' }}
+                    aria-label="More"
+                  >
+                    <IconPlus size={22} stroke={2} />
+                  </ActionIcon>
+                ) : (
+                  <tab.icon
+                    size={22}
+                    stroke={1.5}
+                    color={active ? 'var(--mantine-color-teal-6)' : 'var(--mantine-color-dimmed)'}
+                  />
+                )}
                 <Text
                   size="xs"
                   fw={active ? 600 : 400}
-                  c={active ? 'blue' : 'dimmed'}
+                  c={tab.path === '__more__' ? 'dimmed' : active ? 'teal' : 'dimmed'}
                   style={{ lineHeight: 1 }}
                 >
-                  {tab.label}
+                  {isMore ? '' : tab.label}
                 </Text>
               </UnstyledButton>
             );

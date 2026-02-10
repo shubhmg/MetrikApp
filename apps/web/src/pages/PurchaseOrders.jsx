@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Center, Loader, Pagination, Select, Box, Card, Stack, Group, Text, ActionIcon } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { IconTrash, IconEdit } from '@tabler/icons-react';
 import PageHeader from '../components/PageHeader.jsx';
@@ -24,9 +25,10 @@ function OrderCard({ voucher, onView, onDelete, onEdit }) {
       style={{
         cursor: 'pointer',
         transition: 'background-color 0.2s',
+        backgroundColor: 'var(--app-surface-elevated)',
       }}
-      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mantine-color-gray-0)'}
-      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--app-surface-elevated)'}
+      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--app-surface-elevated)'}
       onClick={() => onView(voucher)}
     >
       <Group justify="space-between" wrap="nowrap" align="flex-start">
@@ -34,7 +36,7 @@ function OrderCard({ voucher, onView, onDelete, onEdit }) {
           <Group gap="xs" mb={2}>
             <Text size="sm" fw={600}>{voucher.partyId?.name || 'No Party'}</Text>
             {voucher.materialCentreId?.name && (
-              <Text size="xs" c="blue" fw={500}>{voucher.materialCentreId.name}</Text>
+              <Text size="xs" c="teal" fw={500}>{voucher.materialCentreId.name}</Text>
             )}
           </Group>
           <Text size="xs" c="dimmed" ff="monospace" mb={4}>{voucher.voucherNumber}</Text>
@@ -56,7 +58,7 @@ function OrderCard({ voucher, onView, onDelete, onEdit }) {
           <Group gap={4}>
             <ActionIcon
               variant="subtle"
-              color="blue"
+              color="teal"
               size="sm"
               onClick={(e) => { e.stopPropagation(); onEdit(voucher); }}
             >
@@ -83,13 +85,10 @@ function OrderGroup({ date, vouchers, onView, onDelete, onEdit }) {
       <Text c="dimmed" size="xs" fw={700} mb="xs" tt="uppercase" style={{ letterSpacing: 0.5 }}>
         {date}
       </Text>
-      <Card withBorder padding={0} radius="md">
-        <Stack gap={0}>
+      <Card padding={0} radius="md" style={{ background: 'transparent', border: 'none', boxShadow: 'none' }}>
+        <Stack gap="sm" style={{ background: 'var(--app-bg)' }}>
           {vouchers.map((v, i) => (
-            <Box
-              key={v._id}
-              style={{ borderBottom: i < vouchers.length - 1 ? '1px solid var(--mantine-color-gray-3)' : 'none' }}
-            >
+            <Box key={v._id}>
               <OrderCard voucher={v} onView={onView} onDelete={onDelete} onEdit={onEdit} />
             </Box>
           ))}
@@ -109,6 +108,7 @@ export default function PurchaseOrders() {
   const [selected, setSelected] = useState(null);
   const [mcFilter, setMcFilter] = useState(null);
   const [mcs, setMcs] = useState([]);
+  const isMobile = useMediaQuery('(max-width: 48em)');
 
   useEffect(() => {
     api.get('/material-centres').then(({ data }) => setMcs(data.data.materialCentres)).catch(() => {});
@@ -179,7 +179,7 @@ export default function PurchaseOrders() {
           value={mcFilter}
           onChange={(val) => { setMcFilter(val); setPage(1); }}
           data={mcOptions}
-          style={{ width: 180 }}
+          style={{ width: isMobile ? '100%' : 180 }}
         />
       </PageHeader>
 

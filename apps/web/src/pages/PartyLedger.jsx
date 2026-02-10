@@ -17,6 +17,7 @@ import {
   Divider,
   Box,
 } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { IconArrowLeft } from '@tabler/icons-react';
 import dayjs from 'dayjs';
 import api from '../services/api.js';
@@ -109,6 +110,7 @@ export default function PartyLedger() {
   const [ledger, setLedger] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const isMobile = useMediaQuery('(max-width: 48em)');
 
   useEffect(() => {
     api.get(`/parties/${id}`)
@@ -164,7 +166,7 @@ export default function PartyLedger() {
           {party && (
             <Group gap="xs" mt={2}>
               {party.type?.map((t) => (
-                <Badge key={t} size="sm" variant="light" color={t === 'customer' ? 'blue' : t === 'vendor' ? 'orange' : 'grape'}>
+                <Badge key={t} size="sm" variant="light" color={t === 'customer' ? 'teal' : t === 'vendor' ? 'orange' : 'teal'}>
                   {t}
                 </Badge>
               ))}
@@ -184,7 +186,7 @@ export default function PartyLedger() {
           value={fy}
           onChange={setFy}
           allowDeselect={false}
-          w={180}
+          w={isMobile ? '100%' : 180}
         />
         {ledger && (
           <SimpleGrid cols={{ base: 1, xs: 3 }}>
@@ -224,7 +226,7 @@ export default function PartyLedger() {
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
-              <Table.Tr style={{ backgroundColor: 'var(--mantine-color-blue-0)' }}>
+              <Table.Tr className="ledger-accent-row">
                 <Table.Td></Table.Td>
                 <Table.Td colSpan={2}><Text size="sm" fw={700}>Opening Balance</Text></Table.Td>
                 <Table.Td></Table.Td>
@@ -266,7 +268,7 @@ export default function PartyLedger() {
                 </Table.Tr>
               ))}
 
-              <Table.Tr style={{ backgroundColor: 'var(--mantine-color-blue-0)' }}>
+              <Table.Tr className="ledger-accent-row">
                 <Table.Td></Table.Td>
                 <Table.Td colSpan={2}><Text size="sm" fw={700}>Closing Balance</Text></Table.Td>
                 <Table.Td>
@@ -282,41 +284,69 @@ export default function PartyLedger() {
         </Box>
       )}
 
-      {/* Mobile card list */}
+      {/* Mobile simple table */}
       {!loading && ledger && (
         <Box hiddenFrom="sm">
           <Card withBorder padding={0} radius="md">
-            {/* Opening balance */}
-            <Box p="sm" style={{ backgroundColor: 'var(--mantine-color-blue-0)', borderBottom: '1px solid var(--mantine-color-gray-3)' }}>
-              <Group justify="space-between">
-                <Text size="sm" fw={700}>Opening Balance</Text>
-                <BalanceText value={ledger.openingBalance || 0} size="sm" />
-              </Group>
-            </Box>
+            <Table striped withTableBorder verticalSpacing="xs">
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th style={{ width: 86 }}>Date</Table.Th>
+                  <Table.Th style={{ width: 70 }}>Vch</Table.Th>
+                  <Table.Th style={{ textAlign: 'right' }}>Amount</Table.Th>
+                  <Table.Th style={{ textAlign: 'right' }}>Bal</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                <Table.Tr className="ledger-accent-row">
+                  <Table.Td></Table.Td>
+                  <Table.Td><Text size="xs" fw={700}>Open</Text></Table.Td>
+                  <Table.Td></Table.Td>
+                  <Table.Td><BalanceText value={ledger.openingBalance || 0} size="xs" fw={600} /></Table.Td>
+                </Table.Tr>
 
-            {rows.length === 0 && (
-              <Text size="sm" c="dimmed" ta="center" py="xl">No transactions in this period</Text>
-            )}
+                {rows.length === 0 && (
+                  <Table.Tr>
+                    <Table.Td colSpan={4}>
+                      <Text size="sm" c="dimmed" ta="center" py="md">No transactions in this period</Text>
+                    </Table.Td>
+                  </Table.Tr>
+                )}
 
-            {rows.map((row) => (
-              <MobileLedgerEntry key={row._id} row={row} />
-            ))}
+                {rows.map((row) => {
+                  const amount = row.debit ? row.debit : row.credit;
+                  const amountLabel = row.debit ? 'Dr' : row.credit ? 'Cr' : '';
+                  const vchDigits = row.voucherNumber ? String(row.voucherNumber).split('-').pop() : '-';
+                  return (
+                    <Table.Tr key={row._id}>
+                      <Table.Td>
+                        <Text size="xs" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                          {dayjs(row.date).format('DD MMM')}
+                        </Text>
+                      </Table.Td>
+                      <Table.Td>
+                        <Text size="xs" ff="monospace">{vchDigits || '-'}</Text>
+                      </Table.Td>
+                      <Table.Td>
+                        <Text size="xs" ta="right" c={row.debit ? 'red.7' : row.credit ? 'green.7' : 'dimmed'} style={{ fontVariantNumeric: 'tabular-nums' }}>
+                          {amount ? `${formatAmt(amount)} ${amountLabel}` : '-'}
+                        </Text>
+                      </Table.Td>
+                      <Table.Td>
+                        <BalanceText value={row.balance} size="xs" fw={600} />
+                      </Table.Td>
+                    </Table.Tr>
+                  );
+                })}
 
-            {/* Closing balance */}
-            <Box p="sm" style={{ backgroundColor: 'var(--mantine-color-blue-0)' }}>
-              <Group justify="space-between" mb={4}>
-                <Text size="sm" fw={700}>Closing Balance</Text>
-                <BalanceText value={closingBalance} size="sm" />
-              </Group>
-              <Group justify="space-between">
-                <Text size="xs" c="red.7" fw={600} style={{ fontVariantNumeric: 'tabular-nums' }}>
-                  Dr {formatAmt(totalDebit)}
-                </Text>
-                <Text size="xs" c="green.7" fw={600} style={{ fontVariantNumeric: 'tabular-nums' }}>
-                  Cr {formatAmt(totalCredit)}
-                </Text>
-              </Group>
-            </Box>
+                <Table.Tr className="ledger-accent-row">
+                  <Table.Td></Table.Td>
+                  <Table.Td><Text size="xs" fw={700}>Close</Text></Table.Td>
+                  <Table.Td></Table.Td>
+                  <Table.Td><BalanceText value={closingBalance} size="xs" fw={600} /></Table.Td>
+                </Table.Tr>
+              </Table.Tbody>
+            </Table>
           </Card>
         </Box>
       )}

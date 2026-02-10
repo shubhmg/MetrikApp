@@ -146,7 +146,7 @@ export default function VoucherDetailModal({ voucher, onClose, onUpdate }) {
                 <Text fw={600} size="sm">Linked Vouchers</Text>
                 <Group gap="xs">
                   {voucher.linkedVouchers.map((lv, i) => (
-                    <Badge key={i} variant="outline" color="blue" size="lg">
+                    <Badge key={i} variant="outline" color="teal" size="lg">
                       {lv.voucherId?.voucherNumber || lv.voucherId} — {lv.relationship?.replace(/_/g, ' ')}
                     </Badge>
                   ))}

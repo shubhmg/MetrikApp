@@ -13,6 +13,7 @@ import {
   Box,
   Anchor,
 } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { useForm } from '@mantine/form';
 import { useAuth } from '../hooks/useAuth.js';
 
@@ -22,6 +23,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const { login, register } = useAuth();
   const navigate = useNavigate();
+  const isMobile = useMediaQuery('(max-width: 48em)');
 
   const form = useForm({
     initialValues: { name: '', email: '', password: '' },
@@ -50,12 +52,12 @@ export default function Login() {
   };
 
   return (
-    <Center mih="100vh">
-      <Box w={400} mx="auto">
-        <Paper withBorder shadow="md" p="xl" radius="md">
+    <Center mih="100vh" p="md">
+      <Box w={isMobile ? '100%' : 420} mx="auto">
+        <Paper withBorder shadow="md" p={isMobile ? 'lg' : 'xl'} radius="md">
           <Stack>
             <div>
-              <Title order={2} ta="center">Natraj ERP</Title>
+              <Title order={isMobile ? 3 : 2} ta="center">Metrik</Title>
               <Text c="dimmed" size="sm" ta="center" mt={4}>
                 {isRegister ? 'Create your account' : 'Sign in to continue'}
               </Text>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Select, Pagination, Center, Loader } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import PageHeader from '../components/PageHeader.jsx';
 import VoucherList from '../components/VoucherList.jsx';
 import VoucherDetailModal from '../components/VoucherDetailModal.jsx';
@@ -33,6 +34,7 @@ export default function Vouchers() {
   const [typeFilter, setTypeFilter] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
+  const isMobile = useMediaQuery('(max-width: 48em)');
 
   useEffect(() => { loadVouchers(); }, [page, typeFilter]);
 
@@ -66,7 +68,7 @@ export default function Vouchers() {
           onChange={(v) => { setTypeFilter(v); setPage(1); }}
           clearable
           searchable
-          w={200}
+          w={isMobile ? '100%' : 200}
         />
       </PageHeader>
 

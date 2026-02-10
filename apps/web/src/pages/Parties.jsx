@@ -15,6 +15,7 @@ import {
   Text,
   Card,
 } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import { IconPencil, IconTrash } from '@tabler/icons-react';
@@ -43,6 +44,7 @@ export default function Parties() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const navigate = useNavigate();
+  const isMobile = useMediaQuery('(max-width: 48em)');
 
   const form = useForm({ initialValues: EMPTY_FORM });
 
@@ -121,7 +123,7 @@ export default function Parties() {
       label: 'Name',
       render: (r) => (
         <Text
-          c="blue"
+          c="teal"
           style={{ cursor: 'pointer', textDecoration: 'underline' }}
           onClick={(e) => {
             e.stopPropagation();
@@ -137,7 +139,7 @@ export default function Parties() {
       render: (r) => (
         <Group gap={4}>
           {r.type.map((t) => (
-            <Badge key={t} variant="light" size="sm" color={t === 'customer' ? 'blue' : t === 'vendor' ? 'orange' : 'grape'}>
+            <Badge key={t} variant="light" size="sm" color={t === 'customer' ? 'teal' : t === 'vendor' ? 'orange' : 'teal'}>
               {t}
             </Badge>
           ))}
@@ -167,9 +169,9 @@ export default function Parties() {
           value={typeFilter}
           onChange={setTypeFilter}
           clearable
-          w={160}
+          w={isMobile ? '100%' : 160}
         />
-        <TextInput placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} w={200} />
+        <TextInput placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} w={isMobile ? '100%' : 200} />
       </PageHeader>
 
       <DataTable
@@ -183,7 +185,7 @@ export default function Parties() {
               <div style={{ minWidth: 0, flex: 1 }}>
                 <Text
                   fw={600}
-                  c="blue"
+                  c="teal"
                   style={{ cursor: 'pointer' }}
                   onClick={() => navigate(`/parties/${r._id}/ledger`)}
                   truncate
@@ -192,7 +194,7 @@ export default function Parties() {
                 </Text>
                 <Group gap={4} mt={4}>
                   {r.type.map((t) => (
-                    <Badge key={t} variant="light" size="sm" color={t === 'customer' ? 'blue' : t === 'vendor' ? 'orange' : 'grape'}>
+                    <Badge key={t} variant="light" size="sm" color={t === 'customer' ? 'teal' : t === 'vendor' ? 'orange' : 'teal'}>
                       {t}
                     </Badge>
                   ))}

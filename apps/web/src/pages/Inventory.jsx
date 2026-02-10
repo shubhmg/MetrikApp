@@ -18,6 +18,7 @@ import {
   Card,
   Text,
 } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import { IconPencil, IconTrash, IconPlus } from '@tabler/icons-react';
@@ -52,6 +53,7 @@ export default function Inventory() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [physicalStockOpen, setPhysicalStockOpen] = useState(false);
+  const isMobile = useMediaQuery('(max-width: 48em)');
 
   const mcForm = useForm({
     initialValues: { name: '', code: '', type: 'factory', isDefault: false },
@@ -67,8 +69,18 @@ export default function Inventory() {
         api.get('/material-centres'),
         api.get('/items/groups'),
       ]);
-      setMcs(mcsRes.data.data.materialCentres);
-      setGroups(groupsRes.data.data.itemGroups);
+      const loadedMcs = mcsRes.data.data.materialCentres;
+      const loadedGroups = groupsRes.data.data.itemGroups;
+      setMcs(loadedMcs);
+      setGroups(loadedGroups);
+      if (!stockMcFilter) {
+        const defaultMc = loadedMcs.find((mc) => mc.isDefault) || loadedMcs[0];
+        if (defaultMc) setStockMcFilter(defaultMc._id);
+      }
+      if (!stockGroupFilter) {
+        const finishedGroup = loadedGroups.find((g) => g.type === 'finished_good') || loadedGroups[0];
+        if (finishedGroup) setStockGroupFilter(finishedGroup._id);
+      }
     } catch { /* ignore */ }
     setLoading(false);
   }
@@ -162,23 +174,24 @@ export default function Inventory() {
 
   return (
     <div>
-      <Title order={2} mb="lg">Inventory</Title>
+      <Title order={isMobile ? 3 : 2} mb="lg">Inventory</Title>
 
       <Tabs defaultValue="stock">
-        <Tabs.List mb="md">
+        <Tabs.List mb="md" grow={isMobile}>
           <Tabs.Tab value="stock">Stock Report</Tabs.Tab>
           <Tabs.Tab value="centres">Material Centres ({mcs.length})</Tabs.Tab>
         </Tabs.List>
 
         <Tabs.Panel value="stock">
           <Stack gap="sm" mb="md">
-            <Group grow>
+            <Group grow wrap={isMobile ? 'wrap' : 'nowrap'}>
               <Select
                 placeholder="Filter by MC"
                 data={mcs.map(m => ({ value: m._id, label: m.name }))}
                 value={stockMcFilter}
                 onChange={setStockMcFilter}
                 clearable
+                size="sm"
               />
               <Select
                 placeholder="Filter by Group"
@@ -186,11 +199,12 @@ export default function Inventory() {
                 value={stockGroupFilter}
                 onChange={setStockGroupFilter}
                 clearable
+                size="sm"
               />
             </Group>
-            <Group>
-              <Button variant="light" onClick={loadStockReport}>Refresh</Button>
-              <Button variant="light" onClick={() => setPhysicalStockOpen(true)}>Physical Stock</Button>
+            <Group grow={isMobile}>
+              <Button size="sm" variant="light" onClick={loadStockReport}>Refresh</Button>
+              <Button size="sm" variant="light" onClick={() => setPhysicalStockOpen(true)}>Physical Stock</Button>
             </Group>
           </Stack>
           <DataTable
@@ -206,10 +220,10 @@ export default function Inventory() {
                     <Text size="xs" c="dimmed" ff="monospace">{r.itemId?.sku || '-'}</Text>
                     <Group gap={6} mt={4}>
                       {r.itemId?.itemGroupId?.name && <Badge variant="light" size="xs">{r.itemId.itemGroupId.name}</Badge>}
-                      {r.materialCentreId?.name && <Badge variant="light" size="xs" color="blue">{r.materialCentreId.name}</Badge>}
+                      {r.materialCentreId?.name && <Badge variant="light" size="xs" color="teal">{r.materialCentreId.name}</Badge>}
                     </Group>
                   </div>
-                  <Text fw={700} size="lg">{r.quantity} <Text span size="xs" c="dimmed">{r.itemId?.unit || ''}</Text></Text>
+                  <Text fw={700} size="md">{r.quantity} <Text span size="xs" c="dimmed">{r.itemId?.unit || ''}</Text></Text>
                 </Group>
               </Card>
             )}
@@ -218,9 +232,31 @@ export default function Inventory() {
 
         <Tabs.Panel value="centres">
           <Group justify="flex-end" mb="sm">
-            <Button leftSection={<IconPlus size={16} />} onClick={openMcCreate}>Add Centre</Button>
+            <Button leftSection={<IconPlus size={16} />} onClick={openMcCreate} fullWidth={isMobile}>Add Centre</Button>
           </Group>
-          <DataTable columns={mcColumns} data={mcs} emptyMessage="No material centres yet" />
+          <DataTable
+            columns={mcColumns}
+            data={mcs}
+            emptyMessage="No material centres yet"
+            mobileRender={(r) => (
+              <Card key={r._id} withBorder padding="sm">
+                <Group justify="space-between" wrap="nowrap">
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <Text fw={600} truncate>{r.name}</Text>
+                    <Text size="xs" c="dimmed" ff="monospace">{r.code}</Text>
+                    <Group gap={6} mt={4}>
+                      <Badge variant="light" size="xs">{r.type}</Badge>
+                      {r.isDefault && <Badge color="green" size="xs">Default</Badge>}
+                    </Group>
+                  </div>
+                  <Group gap={4}>
+                    <ActionIcon variant="subtle" onClick={() => openMcEdit(r)}><IconPencil size={16} /></ActionIcon>
+                    <ActionIcon variant="subtle" color="red" onClick={() => { setDeleteTarget(r); }}><IconTrash size={16} /></ActionIcon>
+                  </Group>
+                </Group>
+              </Card>
+            )}
+          />
         </Tabs.Panel>
       </Tabs>
 

@@ -5,8 +5,8 @@ import app from './app.js';
 async function start() {
   await connectDB();
 
-  app.listen(env.port, () => {
-    console.log(`API server running on port ${env.port} [${env.nodeEnv}]`);
+  app.listen(env.port, env.host, () => {
+    console.log(`API server running on http://${env.host}:${env.port} [${env.nodeEnv}]`);
   });
 }
 

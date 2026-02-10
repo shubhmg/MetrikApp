@@ -18,7 +18,9 @@ import {
   Loader,
   SimpleGrid,
   Badge,
+  Chip,
 } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { DateInput } from '@mantine/dates';
 import { IconPlus, IconTrash, IconArrowLeft } from '@tabler/icons-react';
@@ -65,7 +67,7 @@ const TYPE_GROUPS = [
 const PARTY_TYPES = ['sales_invoice', 'purchase_invoice', 'sales_return', 'purchase_return', 'payment', 'receipt', 'sales_order', 'purchase_order', 'delivery_note', 'grn'];
 const ITEM_TYPES = ['sales_invoice', 'purchase_invoice', 'sales_return', 'purchase_return', 'sales_order', 'purchase_order', 'delivery_note', 'grn', 'stock_transfer', 'production', 'physical_stock'];
 const ACCOUNT_TYPES = ['payment', 'receipt', 'journal', 'contra'];
-const MC_TYPES = ['sales_invoice', 'purchase_invoice', 'sales_return', 'purchase_return', 'grn', 'delivery_note', 'production', 'physical_stock'];
+const MC_TYPES = ['sales_invoice', 'purchase_invoice', 'sales_return', 'purchase_return', 'grn', 'delivery_note', 'production', 'physical_stock', 'sales_order', 'purchase_order'];
 const TRANSFER_TYPE = 'stock_transfer';
 
 const EMPTY_ITEM_LINE = { itemId: '', quantity: 1, rate: 0, discount: 0, gstRate: 18 };
@@ -87,6 +89,8 @@ export default function VoucherCreate() {
   const [accountLines, setAccountLines] = useState([{ ...EMPTY_ACCOUNT_LINE }]);
   const [saving, setSaving] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
+  const [quickInputs, setQuickInputs] = useState({});
+  const isMobile = useMediaQuery('(max-width: 48em)');
 
   // BOM state for production vouchers
   const [activeBom, setActiveBom] = useState(null);
@@ -162,11 +166,14 @@ export default function VoucherCreate() {
       .finally(() => setEditLoading(false));
   }, [editId, loadingRef]);
 
+  const fixedType = searchParams.get('type');
+  const showVoucherType = !fixedType || isEditMode;
   const isItemBased = ITEM_TYPES.includes(voucherType);
   const isAccountBased = ACCOUNT_TYPES.includes(voucherType);
   const needsParty = PARTY_TYPES.includes(voucherType);
   const needsMc = MC_TYPES.includes(voucherType);
   const isTransfer = voucherType === TRANSFER_TYPE;
+  const isSalesQuick = voucherType === 'sales_invoice' || voucherType === 'sales_order';
 
   // Simple mode for Receipt/Payment with Party selected
   const isSimpleMode = (voucherType === 'receipt' || voucherType === 'payment') && partyId;
@@ -177,6 +184,17 @@ export default function VoucherCreate() {
   const itemData = useMemo(() => items.map((i) => ({ value: i._id, label: `${i.sku} - ${i.name}` })), [items]);
   const accountData = useMemo(() => accounts.map((a) => ({ value: a._id, label: `${a.code || ''} ${a.name}`.trim() })), [accounts]);
   const mcData = useMemo(() => mcs.map((m) => ({ value: m._id, label: `${m.code} - ${m.name}` })), [mcs]);
+  const quickMcOptions = useMemo(
+    () => mcs.filter((m) => m.type === 'factory' || m.type === 'godown'),
+    [mcs]
+  );
+  const finishedGoods = useMemo(() => {
+    const list = items.filter((i) => {
+      const groupType = i.itemGroupId?.type || i.itemGroupType || i.type;
+      return groupType === 'finished_good';
+    });
+    return list.length ? list : items;
+  }, [items]);
 
   // Fetch active BOM when output item changes for production vouchers
   async function fetchBomForItem(outputItemId) {
@@ -257,6 +275,43 @@ export default function VoucherCreate() {
   }
   function addAccountLine() { setAccountLines((prev) => [...prev, { ...EMPTY_ACCOUNT_LINE }]); }
   function removeAccountLine(idx) { setAccountLines((prev) => prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev); }
+
+  function updateQuickInput(itemId, field, value) {
+    setQuickInputs((prev) => ({
+      ...prev,
+      [itemId]: {
+        ...(prev[itemId] || {}),
+        [field]: value,
+      },
+    }));
+  }
+
+  function addFromQuick(item) {
+    const entry = quickInputs[item._id] || {};
+    const quantity = Number(entry.quantity || 0);
+    const rate = Number(entry.rate || 0);
+    if (!quantity) {
+      notifications.show({ title: 'Enter quantity', message: 'Please enter a quantity before adding.', color: 'yellow' });
+      return;
+    }
+    setItemLines((prev) => {
+      const idx = prev.findIndex((l) => l.itemId === item._id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = {
+          ...next[idx],
+          quantity,
+          rate,
+        };
+        return next;
+      }
+      return [
+        ...prev,
+        { ...EMPTY_ITEM_LINE, itemId: item._id, quantity, rate },
+      ];
+    });
+    setQuickInputs((prev) => ({ ...prev, [item._id]: { quantity: '', rate: '' } }));
+  }
 
   // Calculations
   const itemCalcs = useMemo(() => {
@@ -345,21 +400,27 @@ export default function VoucherCreate() {
     <div>
       <Group mb="lg">
         <ActionIcon variant="subtle" onClick={() => navigate(-1)}><IconArrowLeft size={20} /></ActionIcon>
-        <Title order={2}>{isEditMode ? (isProduction ? 'Edit Production' : 'Edit Voucher') : (isProduction ? 'New Production' : 'New Voucher')}</Title>
+        <Title order={isMobile ? 3 : 2}>
+          {isEditMode ? (isProduction ? 'Edit Production' : 'Edit Voucher') : (isProduction ? 'New Production' : 'New Voucher')}
+        </Title>
       </Group>
 
-      <Stack>
-        <SimpleGrid cols={{ base: 1, sm: 2 }}>
-          <Select
-            label="Voucher Type"
-            placeholder="Select type..."
-            data={TYPE_GROUPS}
-            value={voucherType}
-            onChange={setVoucherType}
-            searchable
-            required
-            disabled={isEditMode}
-          />
+      <Stack gap={isMobile ? 'md' : 'lg'}>
+        <Card withBorder>
+          <Stack gap="sm">
+            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing={{ base: 'sm', sm: 'md' }}>
+          {showVoucherType && (
+            <Select
+              label="Voucher Type"
+              placeholder="Select type..."
+              data={TYPE_GROUPS}
+              value={voucherType}
+              onChange={setVoucherType}
+              searchable
+              required
+              disabled={isEditMode}
+            />
+          )}
 
           <DateInput
             label="Date"
@@ -382,15 +443,30 @@ export default function VoucherCreate() {
           )}
 
           {needsMc && !isTransfer && (
-            <Select
-              label="Material Centre"
-              placeholder="Select MC..."
-              data={mcData}
-              value={materialCentreId}
-              onChange={setMaterialCentreId}
-              searchable
-              clearable
-            />
+            quickMcOptions.length > 0 ? (
+              <Stack gap={6} style={{ marginTop: 4 }}>
+                <Text size="sm" fw={600} mb={4}>Material Centre</Text>
+                <Chip.Group value={materialCentreId} onChange={setMaterialCentreId} multiple={false}>
+                  <Group gap="xs">
+                    {quickMcOptions.map((mc) => (
+                      <Chip key={mc._id} value={mc._id} variant="light" radius="xl">
+                        {mc.name}
+                      </Chip>
+                    ))}
+                  </Group>
+                </Chip.Group>
+              </Stack>
+            ) : (
+              <Select
+                label="Material Centre"
+                placeholder="Select MC..."
+                data={mcData}
+                value={materialCentreId}
+                onChange={setMaterialCentreId}
+                searchable
+                clearable
+              />
+            )
           )}
 
           {isTransfer && (
@@ -414,10 +490,12 @@ export default function VoucherCreate() {
             </>
           )}
         </SimpleGrid>
+          </Stack>
+        </Card>
 
         {/* BOM indicator for production vouchers */}
         {isProduction && activeBom && (
-          <Alert variant="light" color="blue" title={`BOM: ${activeBom.name} (v${activeBom.version})`}>
+          <Alert variant="light" color="teal" title={`BOM: ${activeBom.name} (v${activeBom.version})`}>
             Active BOM found. Set output quantity to auto-expand input items.
           </Alert>
         )}
@@ -541,74 +619,161 @@ export default function VoucherCreate() {
 
         {/* Item-based line items (non-production) */}
         {isItemBased && !isProduction && voucherType && (
-          <Card withBorder>
-            <Group justify="space-between" mb="sm">
-              <Text fw={600}>Line Items</Text>
-              <Button size="xs" variant="light" leftSection={<IconPlus size={14} />} onClick={addItemLine}>Add Row</Button>
-            </Group>
-            <Table withTableBorder>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th style={{ minWidth: 200 }}>Item</Table.Th>
-                  <Table.Th style={{ width: 80 }}>Qty</Table.Th>
-                  <Table.Th style={{ width: 100 }}>Rate</Table.Th>
-                  <Table.Th style={{ width: 80 }}>Disc</Table.Th>
-                  <Table.Th style={{ width: 70 }}>GST%</Table.Th>
-                  <Table.Th style={{ width: 100, textAlign: 'right' }}>Amount</Table.Th>
-                  <Table.Th style={{ width: 40 }}></Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {itemLines.map((line, idx) => {
-                  const calc = itemCalcs.lines[idx] || {};
-                  return (
-                    <Table.Tr key={idx}>
-                      <Table.Td>
-                        <Select
-                          data={itemData}
-                          value={line.itemId || null}
-                          onChange={(v) => updateItemLine(idx, 'itemId', v)}
-                          searchable
-                          size="xs"
-                          placeholder="Select item..."
-                        />
-                      </Table.Td>
-                      <Table.Td>
-                        <NumberInput size="xs" min={0} value={line.quantity} onChange={(v) => updateItemLine(idx, 'quantity', v || 0)} />
-                      </Table.Td>
-                      <Table.Td>
-                        <NumberInput size="xs" min={0} value={line.rate} onChange={(v) => updateItemLine(idx, 'rate', v || 0)} />
-                      </Table.Td>
-                      <Table.Td>
-                        <NumberInput size="xs" min={0} value={line.discount} onChange={(v) => updateItemLine(idx, 'discount', v || 0)} />
-                      </Table.Td>
-                      <Table.Td>
-                        <NumberInput size="xs" min={0} max={100} value={line.gstRate} onChange={(v) => updateItemLine(idx, 'gstRate', v || 0)} />
-                      </Table.Td>
-                      <Table.Td style={{ textAlign: 'right' }}>
-                        <Text size="sm" fw={500}>{(calc.lineTotal || 0).toLocaleString('en-IN')}</Text>
-                      </Table.Td>
-                      <Table.Td>
-                        <ActionIcon variant="subtle" color="red" size="sm" onClick={() => removeItemLine(idx)}>
-                          <IconTrash size={14} />
-                        </ActionIcon>
-                      </Table.Td>
-                    </Table.Tr>
-                  );
-                })}
-              </Table.Tbody>
-            </Table>
+          isSalesQuick ? (
+            <Stack gap="md">
+              <Card withBorder>
+                <Group justify="space-between" mb="sm">
+                  <Text fw={600}>Finished Goods</Text>
+                  <Text size="xs" c="dimmed">Tap + to add</Text>
+                </Group>
+                <Stack gap="xs">
+                  {finishedGoods.map((item) => {
+                    const entry = quickInputs[item._id] || {};
+                    return (
+                      <Card key={item._id} withBorder padding="sm">
+                        <Group gap="xs" wrap="nowrap" align="center">
+                          <Text fw={600} lineClamp={1} style={{ minWidth: 0, flex: 1 }}>
+                            {item.name}
+                          </Text>
+                          <NumberInput
+                            size="sm"
+                            min={0}
+                            placeholder="Qty"
+                            value={entry.quantity ?? ''}
+                            onChange={(v) => updateQuickInput(item._id, 'quantity', v || '')}
+                            w={isMobile ? 70 : 90}
+                            hideControls
+                            radius="sm"
+                          />
+                          <NumberInput
+                            size="sm"
+                            min={0}
+                            placeholder="Rate"
+                            value={entry.rate ?? ''}
+                            onChange={(v) => updateQuickInput(item._id, 'rate', v || '')}
+                            w={isMobile ? 90 : 120}
+                            hideControls
+                            radius="sm"
+                          />
+                          <ActionIcon variant="light" color="teal" size="md" onClick={() => addFromQuick(item)}>
+                            <IconPlus size={16} />
+                          </ActionIcon>
+                        </Group>
+                      </Card>
+                    );
+                  })}
+                </Stack>
+              </Card>
 
-            <SimpleGrid cols={2} mt="sm">
-              <div />
-              <Stack gap={4}>
-                <Group justify="space-between"><Text size="sm">Subtotal:</Text><Text size="sm">{itemCalcs.subtotal.toLocaleString('en-IN')}</Text></Group>
-                <Group justify="space-between"><Text size="sm">Discount:</Text><Text size="sm">{itemCalcs.totalDiscount.toLocaleString('en-IN')}</Text></Group>
-                <Group justify="space-between"><Text size="sm">Tax:</Text><Text size="sm">{itemCalcs.totalTax.toLocaleString('en-IN')}</Text></Group>
-                <Group justify="space-between"><Text fw={700}>Grand Total:</Text><Text fw={700}>{itemCalcs.grandTotal.toLocaleString('en-IN')}</Text></Group>
-              </Stack>
-            </SimpleGrid>
-          </Card>
+              {itemLines.filter((l) => l.itemId).length > 0 && (
+                <Card withBorder>
+                  <Text fw={600} mb="sm">Selected Items</Text>
+                  <Stack gap="xs">
+                    {itemLines.map((line, idx) => {
+                      if (!line.itemId) return null;
+                      const item = items.find((i) => i._id === line.itemId);
+                      return (
+                        <Card key={`${line.itemId}-${idx}`} withBorder padding="xs">
+                          <Group justify="space-between" wrap="nowrap">
+                            <Stack gap={2} style={{ minWidth: 0, flex: 1 }}>
+                              <Text size="sm" fw={600} lineClamp={1}>{item?.name || 'Item'}</Text>
+                              <Text size="xs" c="dimmed">
+                                {line.quantity} {item?.unit || ''} × {line.rate}
+                              </Text>
+                            </Stack>
+                            <ActionIcon variant="subtle" color="red" size="sm" onClick={() => removeItemLine(idx)}>
+                              <IconTrash size={14} />
+                            </ActionIcon>
+                          </Group>
+                        </Card>
+                      );
+                    })}
+                  </Stack>
+                </Card>
+              )}
+
+              <Card withBorder>
+                <SimpleGrid cols={2}>
+                  <div />
+                  <Stack gap={4}>
+                    <Group justify="space-between"><Text size="sm">Subtotal:</Text><Text size="sm">{itemCalcs.subtotal.toLocaleString('en-IN')}</Text></Group>
+                    <Group justify="space-between"><Text size="sm">Discount:</Text><Text size="sm">{itemCalcs.totalDiscount.toLocaleString('en-IN')}</Text></Group>
+                    <Group justify="space-between"><Text size="sm">Tax:</Text><Text size="sm">{itemCalcs.totalTax.toLocaleString('en-IN')}</Text></Group>
+                    <Group justify="space-between"><Text fw={700}>Grand Total:</Text><Text fw={700}>{itemCalcs.grandTotal.toLocaleString('en-IN')}</Text></Group>
+                  </Stack>
+                </SimpleGrid>
+              </Card>
+            </Stack>
+          ) : (
+            <Card withBorder>
+              <Group justify="space-between" mb="sm">
+                <Text fw={600}>Line Items</Text>
+                <Button size="xs" variant="light" leftSection={<IconPlus size={14} />} onClick={addItemLine}>Add Row</Button>
+              </Group>
+              <Table withTableBorder>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th style={{ minWidth: 200 }}>Item</Table.Th>
+                    <Table.Th style={{ width: 80 }}>Qty</Table.Th>
+                    <Table.Th style={{ width: 100 }}>Rate</Table.Th>
+                    <Table.Th style={{ width: 80 }}>Disc</Table.Th>
+                    <Table.Th style={{ width: 70 }}>GST%</Table.Th>
+                    <Table.Th style={{ width: 100, textAlign: 'right' }}>Amount</Table.Th>
+                    <Table.Th style={{ width: 40 }}></Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {itemLines.map((line, idx) => {
+                    const calc = itemCalcs.lines[idx] || {};
+                    return (
+                      <Table.Tr key={idx}>
+                        <Table.Td>
+                          <Select
+                            data={itemData}
+                            value={line.itemId || null}
+                            onChange={(v) => updateItemLine(idx, 'itemId', v)}
+                            searchable
+                            size="xs"
+                            placeholder="Select item..."
+                          />
+                        </Table.Td>
+                        <Table.Td>
+                          <NumberInput size="xs" min={0} value={line.quantity} onChange={(v) => updateItemLine(idx, 'quantity', v || 0)} />
+                        </Table.Td>
+                        <Table.Td>
+                          <NumberInput size="xs" min={0} value={line.rate} onChange={(v) => updateItemLine(idx, 'rate', v || 0)} />
+                        </Table.Td>
+                        <Table.Td>
+                          <NumberInput size="xs" min={0} value={line.discount} onChange={(v) => updateItemLine(idx, 'discount', v || 0)} />
+                        </Table.Td>
+                        <Table.Td>
+                          <NumberInput size="xs" min={0} max={100} value={line.gstRate} onChange={(v) => updateItemLine(idx, 'gstRate', v || 0)} />
+                        </Table.Td>
+                        <Table.Td style={{ textAlign: 'right' }}>
+                          <Text size="sm" fw={500}>{(calc.lineTotal || 0).toLocaleString('en-IN')}</Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <ActionIcon variant="subtle" color="red" size="sm" onClick={() => removeItemLine(idx)}>
+                            <IconTrash size={14} />
+                          </ActionIcon>
+                        </Table.Td>
+                      </Table.Tr>
+                    );
+                  })}
+                </Table.Tbody>
+              </Table>
+
+              <SimpleGrid cols={2} mt="sm">
+                <div />
+                <Stack gap={4}>
+                  <Group justify="space-between"><Text size="sm">Subtotal:</Text><Text size="sm">{itemCalcs.subtotal.toLocaleString('en-IN')}</Text></Group>
+                  <Group justify="space-between"><Text size="sm">Discount:</Text><Text size="sm">{itemCalcs.totalDiscount.toLocaleString('en-IN')}</Text></Group>
+                  <Group justify="space-between"><Text size="sm">Tax:</Text><Text size="sm">{itemCalcs.totalTax.toLocaleString('en-IN')}</Text></Group>
+                  <Group justify="space-between"><Text fw={700}>Grand Total:</Text><Text fw={700}>{itemCalcs.grandTotal.toLocaleString('en-IN')}</Text></Group>
+                </Stack>
+              </SimpleGrid>
+            </Card>
+          )
         )}
 
         {/* Account-based line items */}
@@ -703,7 +868,9 @@ export default function VoucherCreate() {
           </Card>
         )}
 
-        <Textarea label="Narration" value={narration} onChange={(e) => setNarration(e.target.value)} minRows={2} />
+        <Card withBorder>
+          <Textarea label="Narration" value={narration} onChange={(e) => setNarration(e.target.value)} minRows={2} />
+        </Card>
 
         <Group justify="flex-end">
           <Button variant="default" onClick={() => navigate(-1)}>Cancel</Button>

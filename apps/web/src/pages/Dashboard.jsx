@@ -12,6 +12,7 @@ import {
   Center,
   Loader,
 } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { IconPlus, IconClipboardList, IconClipboardCheck } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
@@ -29,6 +30,7 @@ export default function Dashboard() {
   const [creating, setCreating] = useState(false);
   const [salesOrderCount, setSalesOrderCount] = useState(0);
   const [purchaseOrderCount, setPurchaseOrderCount] = useState(0);
+  const isMobile = useMediaQuery('(max-width: 48em)');
 
   useEffect(() => { loadBusinesses(); }, []);
 
@@ -77,19 +79,21 @@ export default function Dashboard() {
 
   return (
     <div>
-      <Title order={2} mb={4}>Dashboard</Title>
-      <Text c="dimmed" mb="lg">Welcome, {user?.name}</Text>
+      <Stack gap={4} mb="lg">
+        <Title order={isMobile ? 3 : 2}>Dashboard</Title>
+        <Text c="dimmed">Welcome, {user?.name}</Text>
+      </Stack>
 
       {currentBusinessId && (
         <SimpleGrid cols={{ base: 1, xs: 2 }} mb="lg">
           <Card
             withBorder
-            padding="lg"
+            padding={isMobile ? 'md' : 'lg'}
             style={{ cursor: 'pointer' }}
             onClick={() => navigate('/sales-orders')}
           >
             <Group gap="sm">
-              <IconClipboardList size={24} stroke={1.5} color="var(--mantine-color-blue-6)" />
+              <IconClipboardList size={24} stroke={1.5} color="var(--mantine-color-teal-6)" />
               <div>
                 <Text size="xl" fw={700}>{salesOrderCount}</Text>
                 <Text size="sm" c="dimmed">Sales Orders Today</Text>
@@ -98,7 +102,7 @@ export default function Dashboard() {
           </Card>
           <Card
             withBorder
-            padding="lg"
+            padding={isMobile ? 'md' : 'lg'}
             style={{ cursor: 'pointer' }}
             onClick={() => navigate('/purchase-orders')}
           >
@@ -113,12 +117,13 @@ export default function Dashboard() {
         </SimpleGrid>
       )}
 
-      <Group justify="space-between" mb="md">
-        <Title order={3}>Your Businesses</Title>
+      <Group justify="space-between" align="center" wrap="wrap" mb="md">
+        <Title order={isMobile ? 4 : 3}>Your Businesses</Title>
         <Button
           leftSection={<IconPlus size={16} />}
           variant="light"
           onClick={() => setShowCreate(!showCreate)}
+          fullWidth={isMobile}
         >
           New Business
         </Button>
@@ -127,17 +132,30 @@ export default function Dashboard() {
       {showCreate && (
         <Card withBorder mb="md" p="sm">
           <form onSubmit={handleCreate}>
-            <Group>
-              <TextInput
-                placeholder="Business name"
-                value={newBizName}
-                onChange={(e) => setNewBizName(e.target.value)}
-                style={{ flex: 1 }}
-                required
-              />
-              <Button type="submit" loading={creating}>Create</Button>
-              <Button variant="default" onClick={() => setShowCreate(false)}>Cancel</Button>
-            </Group>
+            {isMobile ? (
+              <Stack>
+                <TextInput
+                  placeholder="Business name"
+                  value={newBizName}
+                  onChange={(e) => setNewBizName(e.target.value)}
+                  required
+                />
+                <Button type="submit" loading={creating}>Create</Button>
+                <Button variant="default" onClick={() => setShowCreate(false)}>Cancel</Button>
+              </Stack>
+            ) : (
+              <Group>
+                <TextInput
+                  placeholder="Business name"
+                  value={newBizName}
+                  onChange={(e) => setNewBizName(e.target.value)}
+                  style={{ flex: 1 }}
+                  required
+                />
+                <Button type="submit" loading={creating}>Create</Button>
+                <Button variant="default" onClick={() => setShowCreate(false)}>Cancel</Button>
+              </Group>
+            )}
           </form>
         </Card>
       )}
@@ -152,10 +170,10 @@ export default function Dashboard() {
               <Card
                 key={biz._id}
                 withBorder
-                padding="lg"
+                padding={isMobile ? 'md' : 'lg'}
                 style={{
                   cursor: 'pointer',
-                  borderColor: isActive ? 'var(--mantine-color-blue-5)' : undefined,
+                  borderColor: isActive ? 'var(--mantine-color-teal-5)' : undefined,
                   backgroundColor: isActive ? 'var(--mantine-color-primary-light)' : undefined,
                 }}
                 onClick={() => setCurrentBusiness(biz._id)}
@@ -163,7 +181,7 @@ export default function Dashboard() {
                 <Stack gap="xs">
                   <Group justify="space-between">
                     <Text fw={600}>{biz.name}</Text>
-                    {isActive && <Badge color="blue">Active</Badge>}
+                    {isActive && <Badge color="teal">Active</Badge>}
                   </Group>
                   <Text size="sm" c="dimmed" tt="capitalize">{biz.role}</Text>
                 </Stack>

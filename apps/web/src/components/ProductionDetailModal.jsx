@@ -54,7 +54,7 @@ export default function ProductionDetailModal({ voucher, onClose, onUpdate }) {
           </SimpleGrid>
 
           {voucher.bomId && (
-            <Badge variant="light" color="violet" size="md" style={{ alignSelf: 'flex-start' }}>
+            <Badge variant="light" color="teal" size="md" style={{ alignSelf: 'flex-start' }}>
               BOM: {voucher.bomId.name} v{voucher.bomId.version}
             </Badge>
           )}

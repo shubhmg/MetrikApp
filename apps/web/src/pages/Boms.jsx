@@ -17,7 +17,9 @@ import {
   Table,
   Text,
   Menu,
+  Card,
 } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import {
@@ -53,6 +55,7 @@ export default function Boms() {
   const [error, setError] = useState('');
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const isMobile = useMediaQuery('(max-width: 48em)');
 
   // Version history modal
   const [historyItemId, setHistoryItemId] = useState(null);
@@ -310,12 +313,19 @@ export default function Boms() {
 
   return (
     <div>
-      <Group justify="space-between" mb="lg">
-        <Title order={2}>Bill of Materials</Title>
-        <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>New BOM</Button>
-      </Group>
+      {isMobile ? (
+        <Stack gap="sm" mb="lg">
+          <Title order={3}>Bill of Materials</Title>
+          <Button leftSection={<IconPlus size={16} />} onClick={openCreate} fullWidth>New BOM</Button>
+        </Stack>
+      ) : (
+        <Group justify="space-between" mb="lg">
+          <Title order={2}>Bill of Materials</Title>
+          <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>New BOM</Button>
+        </Group>
+      )}
 
-      <Group mb="md">
+      <Group mb="md" grow={isMobile}>
         <Select
           placeholder="Filter by status"
           data={[
@@ -327,7 +337,7 @@ export default function Boms() {
           onChange={setFilterStatus}
           clearable
           size="sm"
-          style={{ width: 160 }}
+          style={{ width: isMobile ? '100%' : 160 }}
         />
         <Select
           placeholder="Filter by output item"
@@ -337,11 +347,39 @@ export default function Boms() {
           clearable
           searchable
           size="sm"
-          style={{ width: 250 }}
+          style={{ width: isMobile ? '100%' : 250 }}
         />
       </Group>
 
-      <DataTable columns={columns} data={filteredBoms} emptyMessage="No BOMs yet" />
+      <DataTable
+        columns={columns}
+        data={filteredBoms}
+        emptyMessage="No BOMs yet"
+        mobileRender={(b) => (
+          <Card key={b._id} withBorder padding="sm">
+            <Group justify="space-between" wrap="nowrap">
+              <Stack gap={4} style={{ minWidth: 0, flex: 1 }}>
+                <Text fw={600} truncate>{b.name}</Text>
+                <Text size="xs" c="dimmed">
+                  Output: {b.outputItemId?.name || b.outputItemName || '-'}
+                </Text>
+                <Group gap={6}>
+                  <Badge size="xs" variant="light" color={STATUS_COLORS[b.status] || 'gray'}>
+                    {b.status}
+                  </Badge>
+                  {b.version != null && (
+                    <Badge size="xs" variant="light">v{b.version}</Badge>
+                  )}
+                </Group>
+              </Stack>
+              <Group gap={4}>
+                <ActionIcon variant="subtle" onClick={() => openEdit(b)}><IconPencil size={16} /></ActionIcon>
+                <ActionIcon variant="subtle" color="red" onClick={() => setDeleteTarget(b)}><IconTrash size={16} /></ActionIcon>
+              </Group>
+            </Group>
+          </Card>
+        )}
+      />
 
       {/* Create/Edit Modal */}
       <Modal opened={modalOpen} onClose={() => setModalOpen(false)} title={editingId ? 'Edit BOM' : 'New BOM'} centered size="lg">

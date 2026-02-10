@@ -17,6 +17,7 @@ import {
   Loader,
   Tooltip,
 } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import { IconPencil, IconTrash, IconLock } from '@tabler/icons-react';
@@ -25,11 +26,11 @@ import ConfirmDelete from '../components/ConfirmDelete.jsx';
 import api from '../services/api.js';
 
 const TYPE_DATA = [
-  { value: 'asset', label: 'Asset', color: 'blue' },
+  { value: 'asset', label: 'Asset', color: 'teal' },
   { value: 'liability', label: 'Liability', color: 'red' },
   { value: 'income', label: 'Income', color: 'green' },
   { value: 'expense', label: 'Expense', color: 'yellow' },
-  { value: 'equity', label: 'Equity', color: 'grape' },
+  { value: 'equity', label: 'Equity', color: 'teal' },
 ];
 
 const TYPE_MAP = Object.fromEntries(TYPE_DATA.map((t) => [t.value, t]));
@@ -47,6 +48,7 @@ export default function Accounting() {
   const [error, setError] = useState('');
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const isMobile = useMediaQuery('(max-width: 48em)');
 
   const form = useForm({ initialValues: EMPTY_FORM });
 
@@ -143,9 +145,9 @@ export default function Accounting() {
           value={typeFilter}
           onChange={setTypeFilter}
           clearable
-          w={160}
+          w={isMobile ? '100%' : 160}
         />
-        <TextInput placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} w={200} />
+        <TextInput placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} w={isMobile ? '100%' : 200} />
       </PageHeader>
 
       {loading ? (

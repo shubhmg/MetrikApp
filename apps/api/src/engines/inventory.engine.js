@@ -1,5 +1,7 @@
 import InventoryLedger from '../modules/voucher/inventoryLedger.model.js';
 import StockSummary from '../modules/voucher/stockSummary.model.js';
+import Item from '../modules/item/item.model.js';
+import MaterialCentre from '../modules/material-centre/materialCentre.model.js';
 import ApiError from '../utils/ApiError.js';
 
 /**
@@ -41,8 +43,14 @@ export async function postEntries(entries, session) {
 
       const available = summary ? summary.quantity : 0;
       if (available < entry.quantity) {
+        const [itemDoc, mcDoc] = await Promise.all([
+          withSession(Item.findById(entry.itemId).select('name sku'), session),
+          withSession(MaterialCentre.findById(entry.materialCentreId).select('name code'), session),
+        ]);
+        const itemLabel = itemDoc ? `${itemDoc.name}${itemDoc.sku ? ` (${itemDoc.sku})` : ''}` : entry.itemId;
+        const mcLabel = mcDoc ? `${mcDoc.name}${mcDoc.code ? ` (${mcDoc.code})` : ''}` : entry.materialCentreId;
         throw ApiError.badRequest(
-          `Insufficient stock for item ${entry.itemId} at MC ${entry.materialCentreId}: available=${available}, requested=${entry.quantity}`
+          `Insufficient stock for item ${itemLabel} at MC ${mcLabel}: available=${available}, requested=${entry.quantity}`
         );
       }
     }
