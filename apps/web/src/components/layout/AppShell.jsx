@@ -163,7 +163,7 @@ export default function AppShell() {
               {!isMobile && (
                 <Burger opened={sidebarOpened} onClick={() => setSidebarOpened(!sidebarOpened)} hiddenFrom="sm" size="sm" />
               )}
-              <Text fw={700} size="lg" c="teal">Metrik</Text>
+              <Text fw={700} size="1.5rem" c="teal">Metrik</Text>
             </Group>
             <Group>
               {!isMobile && (
