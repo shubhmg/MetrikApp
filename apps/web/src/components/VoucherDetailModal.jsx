@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Modal, Stack, SimpleGrid, Text, Badge, Table, Group, Button, Textarea } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import api from '../services/api.js';
+import { usePermission } from '../hooks/usePermission.js';
 
 
 function fmtDate(d) {
@@ -21,10 +23,17 @@ const ORDER_TYPES = ['sales_order', 'purchase_order'];
 
 export default function VoucherDetailModal({ voucher, onClose, onUpdate }) {
   const navigate = useNavigate();
+  const { can } = usePermission();
   const [cancelModal, setCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [converting, setConverting] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const isMobile = useMediaQuery('(max-width: 48em)');
+
+  // Voucher-type-specific permissions
+  const vType = voucher?.voucherType;
+  const canWriteType = vType ? can(vType, 'write') : false;
+  const canDeleteType = vType ? can(vType, 'delete') : false;
 
   async function handleCancel() {
     if (!cancelReason.trim()) return;
@@ -76,7 +85,7 @@ export default function VoucherDetailModal({ voucher, onClose, onUpdate }) {
 
   return (
     <>
-      <Modal opened={!!voucher} onClose={onClose} title={voucher.voucherNumber} centered size="lg">
+      <Modal opened={!!voucher} onClose={onClose} title={voucher.voucherNumber} centered size="lg" fullScreen={isMobile}>
         <Stack>
             <SimpleGrid cols={2}>
               <Text size="sm"><strong>Type:</strong> {fmtType(voucher.voucherType)}</Text>
@@ -155,20 +164,20 @@ export default function VoucherDetailModal({ voucher, onClose, onUpdate }) {
             )}
 
             <Group justify="flex-end">
-              {voucher.status === 'posted' && (
+              {voucher.status === 'posted' && canWriteType && (
                 <Button variant="light" onClick={() => { navigate(`/vouchers/${voucher._id}/edit`); onClose(); }}>
                   Edit
                 </Button>
               )}
               {ORDER_TYPES.includes(voucher.voucherType) ? (
                 <>
-                  <Button color="red" loading={deleting} onClick={handleDelete}>Delete</Button>
-                  <Button color="teal" loading={converting} onClick={handleConvertToInvoice}>
+                  {canDeleteType && <Button color="red" loading={deleting} onClick={handleDelete}>Delete</Button>}
+                  {canWriteType && <Button color="teal" loading={converting} onClick={handleConvertToInvoice}>
                     Convert to Invoice
-                  </Button>
+                  </Button>}
                 </>
               ) : (
-                voucher.status === 'posted' && <Button color="red" onClick={() => { setCancelModal(true); setCancelReason(''); }}>Cancel Voucher</Button>
+                voucher.status === 'posted' && canDeleteType && <Button color="red" onClick={() => { setCancelModal(true); setCancelReason(''); }}>Cancel Voucher</Button>
               )}
             </Group>
         </Stack>

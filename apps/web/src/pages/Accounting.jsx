@@ -16,6 +16,8 @@ import {
   Center,
   Loader,
   Tooltip,
+  Card,
+  Box,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { useForm } from '@mantine/form';
@@ -24,6 +26,7 @@ import { IconPencil, IconTrash, IconLock } from '@tabler/icons-react';
 import PageHeader from '../components/PageHeader.jsx';
 import ConfirmDelete from '../components/ConfirmDelete.jsx';
 import api from '../services/api.js';
+import { usePermission } from '../hooks/usePermission.js';
 
 const TYPE_DATA = [
   { value: 'asset', label: 'Asset', color: 'teal' },
@@ -38,6 +41,9 @@ const TYPE_MAP = Object.fromEntries(TYPE_DATA.map((t) => [t.value, t]));
 const EMPTY_FORM = { name: '', code: '', type: 'asset', group: '', openingDebit: 0, openingCredit: 0 };
 
 export default function Accounting() {
+  const { can } = usePermission();
+  const canWrite = can('accounting', 'write');
+  const canDelete = can('accounting', 'delete');
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [typeFilter, setTypeFilter] = useState(null);
@@ -138,7 +144,7 @@ export default function Accounting() {
 
   return (
     <div>
-      <PageHeader title="Chart of Accounts" count={filtered.length} actionLabel="Add Account" onAction={openCreate}>
+      <PageHeader title="Chart of Accounts" count={filtered.length} actionLabel={canWrite ? "Add Account" : null} onAction={openCreate}>
         <Select
           placeholder="All Types"
           data={TYPE_DATA.map((t) => ({ value: t.value, label: t.label }))}
@@ -163,35 +169,60 @@ export default function Accounting() {
                 <Badge color={meta.color} variant="filled" size="lg">{meta.label}</Badge>
                 <Text size="sm" c="dimmed">({accs.length})</Text>
               </Group>
-              <Table striped withTableBorder>
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th>Code</Table.Th>
-                    <Table.Th>Name</Table.Th>
-                    <Table.Th>Group</Table.Th>
-                    <Table.Th>System</Table.Th>
-                    <Table.Th w={80}></Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
+              {isMobile ? (
+                <Stack gap="xs">
                   {accs.map((a) => (
-                    <Table.Tr key={a._id}>
-                      <Table.Td style={{ fontFamily: 'monospace' }}>{a.code || '-'}</Table.Td>
-                      <Table.Td>{a.name}</Table.Td>
-                      <Table.Td>{a.group || '-'}</Table.Td>
-                      <Table.Td>{a.isSystemAccount ? <IconLock size={16} color="gray" /> : null}</Table.Td>
-                      <Table.Td>
-                        {a.isSystemAccount ? null : (
+                    <Card key={a._id} withBorder padding="sm">
+                      <Group justify="space-between" wrap="nowrap">
+                        <Stack gap={2} style={{ minWidth: 0, flex: 1 }}>
+                          <Text fw={600} truncate>{a.name}</Text>
+                          <Group gap={6}>
+                            {a.code && <Text size="xs" c="dimmed" ff="monospace">{a.code}</Text>}
+                            {a.group && <Text size="xs" c="dimmed">{a.group}</Text>}
+                            {a.isSystemAccount && <IconLock size={14} color="var(--app-muted)" />}
+                          </Group>
+                        </Stack>
+                        {!a.isSystemAccount && (
                           <Group gap={4}>
-                            <ActionIcon variant="subtle" onClick={() => openEdit(a)}><IconPencil size={16} /></ActionIcon>
-                            <ActionIcon variant="subtle" color="red" onClick={() => setDeleteTarget(a)}><IconTrash size={16} /></ActionIcon>
+                            {canWrite && <ActionIcon variant="subtle" onClick={() => openEdit(a)}><IconPencil size={16} /></ActionIcon>}
+                            {canDelete && <ActionIcon variant="subtle" color="red" onClick={() => setDeleteTarget(a)}><IconTrash size={16} /></ActionIcon>}
                           </Group>
                         )}
-                      </Table.Td>
-                    </Table.Tr>
+                      </Group>
+                    </Card>
                   ))}
-                </Table.Tbody>
-              </Table>
+                </Stack>
+              ) : (
+                <Table striped withTableBorder>
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th>Code</Table.Th>
+                      <Table.Th>Name</Table.Th>
+                      <Table.Th>Group</Table.Th>
+                      <Table.Th>System</Table.Th>
+                      <Table.Th w={80}></Table.Th>
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {accs.map((a) => (
+                      <Table.Tr key={a._id}>
+                        <Table.Td style={{ fontFamily: 'monospace' }}>{a.code || '-'}</Table.Td>
+                        <Table.Td>{a.name}</Table.Td>
+                        <Table.Td>{a.group || '-'}</Table.Td>
+                        <Table.Td>{a.isSystemAccount ? <IconLock size={16} color="var(--app-muted)" /> : null}</Table.Td>
+                        <Table.Td>
+                          {a.isSystemAccount ? null : (
+                            <Group gap={4}>
+                              {canWrite && <ActionIcon variant="subtle" onClick={() => openEdit(a)}><IconPencil size={16} /></ActionIcon>}
+                              {canDelete && <ActionIcon variant="subtle" color="red" onClick={() => setDeleteTarget(a)}><IconTrash size={16} /></ActionIcon>}
+                            </Group>
+                          )}
+                        </Table.Td>
+                      </Table.Tr>
+                    ))}
+                  </Table.Tbody>
+                </Table>
+              )}
             </div>
           );
         })
@@ -202,6 +233,7 @@ export default function Accounting() {
         onClose={() => setModalOpen(false)}
         title={editingId ? 'Edit Account' : 'New Account'}
         centered
+        fullScreen={isMobile}
       >
         {error && <Alert color="red" variant="light" mb="sm">{error}</Alert>}
         <form onSubmit={form.onSubmit(handleSubmit)}>

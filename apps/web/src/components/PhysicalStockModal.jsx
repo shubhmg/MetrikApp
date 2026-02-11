@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Modal, Select, Table, NumberInput, Button, Group, Loader } from '@mantine/core';
+import { Modal, Select, Table, NumberInput, Button, Group, Loader, Text } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import api from '../services/api';
 
@@ -11,6 +12,7 @@ export default function PhysicalStockModal({ opened, onClose }) {
   const [saving, setSaving] = useState(false);
   const [stockData, setStockData] = useState({}); // itemId -> systemQty
   const [selectOpen, setSelectOpen] = useState(false);
+  const isMobile = useMediaQuery('(max-width: 48em)');
 
   useEffect(() => {
     if (opened) {
@@ -100,7 +102,7 @@ export default function PhysicalStockModal({ opened, onClose }) {
   }
 
   return (
-    <Modal opened={opened} onClose={onClose} title="Physical Stock Verification" size="xl">
+    <Modal opened={opened} onClose={onClose} title="Physical Stock Verification" size="xl" fullScreen={isMobile}>
       <Select 
         label="Material Centre" 
         data={mcs} 
@@ -138,8 +140,8 @@ export default function PhysicalStockModal({ opened, onClose }) {
                     return (
                       <Table.Tr key={item._id}>
                         <Table.Td>
-                          <div>{item.name}</div>
-                          <div style={{ fontSize: '0.8em', color: 'gray' }}>{item.sku}</div>
+                          <Text size="sm">{item.name}</Text>
+                          <Text size="xs" c="dimmed" ff="monospace">{item.sku}</Text>
                         </Table.Td>
                         <Table.Td>{systemQty} {item.unit}</Table.Td>
                         <Table.Td>
@@ -151,11 +153,14 @@ export default function PhysicalStockModal({ opened, onClose }) {
                             hideControls
                           />
                         </Table.Td>
-                        <Table.Td style={{ 
-                          color: diff < 0 ? 'red' : diff > 0 ? 'green' : 'inherit',
-                          fontWeight: diff !== 0 ? 'bold' : 'normal'
-                        }}>
-                          {diff !== 0 ? (diff > 0 ? `+${diff}` : diff) : '-'}
+                        <Table.Td>
+                          <Text
+                            size="sm"
+                            fw={diff !== 0 ? 700 : 400}
+                            c={diff < 0 ? 'red.6' : diff > 0 ? 'green.6' : 'dimmed'}
+                          >
+                            {diff !== 0 ? (diff > 0 ? `+${diff}` : diff) : '-'}
+                          </Text>
                         </Table.Td>
                       </Table.Tr>
                     );

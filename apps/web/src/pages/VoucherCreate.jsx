@@ -25,6 +25,7 @@ import { notifications } from '@mantine/notifications';
 import { DateInput } from '@mantine/dates';
 import { IconPlus, IconTrash, IconArrowLeft } from '@tabler/icons-react';
 import api from '../services/api.js';
+import { usePermission } from '../hooks/usePermission.js';
 
 const TYPE_GROUPS = [
   {
@@ -75,6 +76,7 @@ const EMPTY_ACCOUNT_LINE = { accountId: '', debit: 0, credit: 0, narration: '' }
 
 export default function VoucherCreate() {
   const navigate = useNavigate();
+  const { can } = usePermission();
   const [searchParams] = useSearchParams();
   const { id: editId } = useParams();
   const isEditMode = !!editId;
@@ -111,7 +113,7 @@ export default function VoucherCreate() {
           api.get('/parties'),
           api.get('/items'),
           api.get('/accounts'),
-          api.get('/material-centres'),
+          api.get('/material-centres/lookup'),
         ]);
         setParties(p.data.data.parties);
         setItems(i.data.data.items);
@@ -165,6 +167,15 @@ export default function VoucherCreate() {
       })
       .finally(() => setEditLoading(false));
   }, [editId, loadingRef]);
+
+  // Filter voucher type dropdown to only types user can write
+  const filteredTypeGroups = useMemo(() =>
+    TYPE_GROUPS.map((g) => ({
+      ...g,
+      items: g.items.filter((item) => can(item.value, 'write')),
+    })).filter((g) => g.items.length > 0),
+    [can]
+  );
 
   const fixedType = searchParams.get('type');
   const showVoucherType = !fixedType || isEditMode;
@@ -242,10 +253,13 @@ export default function VoucherCreate() {
     setItemLines((prev) => {
       const next = [...prev];
       next[idx] = { ...next[idx], [field]: value };
-      // Auto-fill gstRate from item
+      // Auto-fill gstRate and rate from item
       if (field === 'itemId') {
         const item = items.find((i) => i._id === value);
-        if (item) next[idx].gstRate = item.gstRate ?? 18;
+        if (item) {
+          next[idx].gstRate = item.gstRate ?? 18;
+          if (item.salesPrice > 0) next[idx].rate = item.salesPrice;
+        }
       }
       return next;
     });
@@ -289,7 +303,7 @@ export default function VoucherCreate() {
   function addFromQuick(item) {
     const entry = quickInputs[item._id] || {};
     const quantity = Number(entry.quantity || 0);
-    const rate = Number(entry.rate || 0);
+    const rate = Number(entry.rate || item.salesPrice || 0);
     if (!quantity) {
       notifications.show({ title: 'Enter quantity', message: 'Please enter a quantity before adding.', color: 'yellow' });
       return;
@@ -336,6 +350,10 @@ export default function VoucherCreate() {
   }, [accountLines]);
 
   async function handleSave() {
+    if (voucherType && !can(voucherType, 'write')) {
+      notifications.show({ title: 'Not allowed', message: 'You do not have permission to create this voucher type', color: 'red' });
+      return;
+    }
     if (!voucherType) {
       notifications.show({ title: 'Select type', message: 'Please select a voucher type', color: 'red' });
       return;
@@ -396,6 +414,14 @@ export default function VoucherCreate() {
 
   if (loadingRef || editLoading) return <Center py="xl"><Loader /></Center>;
 
+  if (voucherType && !can(voucherType, 'write')) {
+    return (
+      <Alert color="red" variant="light">
+        You do not have permission to access this voucher type.
+      </Alert>
+    );
+  }
+
   return (
     <div>
       <Group mb="lg">
@@ -413,7 +439,7 @@ export default function VoucherCreate() {
             <Select
               label="Voucher Type"
               placeholder="Select type..."
-              data={TYPE_GROUPS}
+              data={filteredTypeGroups}
               value={voucherType}
               onChange={setVoucherType}
               searchable
@@ -544,26 +570,52 @@ export default function VoucherCreate() {
                   <Text fw={600} c="orange">Inputs (Raw Materials Consumed)</Text>
                   <Button size="xs" variant="light" color="orange" leftSection={<IconPlus size={14} />} onClick={addItemLine}>Add Input</Button>
                 </Group>
-                <Table withTableBorder>
-                  <Table.Thead>
-                    <Table.Tr>
-                      <Table.Th style={{ minWidth: 200 }}>Item</Table.Th>
-                      <Table.Th style={{ width: 100 }}>Qty</Table.Th>
-                      <Table.Th style={{ width: 120 }}>Rate</Table.Th>
-                      <Table.Th style={{ width: 120, textAlign: 'right' }}>Amount</Table.Th>
-                      <Table.Th style={{ width: 40 }}></Table.Th>
-                    </Table.Tr>
-                  </Table.Thead>
-                  <Table.Tbody>
-                    {inputLines.length === 0 ? (
+                {inputLines.length === 0 ? (
+                  <Text size="sm" c="dimmed" ta="center" py="sm">No input items. Add rows or select an output item with an active BOM.</Text>
+                ) : isMobile ? (
+                  <Stack gap="xs">
+                    {inputLines.map((line, i) => {
+                      const realIdx = i + 1;
+                      const lineAmount = line.quantity * line.rate;
+                      return (
+                        <Card key={realIdx} withBorder padding="xs">
+                          <Group justify="space-between" wrap="nowrap" mb={4}>
+                            <Select
+                              data={itemData}
+                              value={line.itemId || null}
+                              onChange={(v) => updateItemLine(realIdx, 'itemId', v)}
+                              searchable
+                              size="xs"
+                              placeholder="Select item..."
+                              style={{ flex: 1 }}
+                            />
+                            <ActionIcon variant="subtle" color="red" size="sm" onClick={() => removeItemLine(realIdx)}>
+                              <IconTrash size={14} />
+                            </ActionIcon>
+                          </Group>
+                          <Group grow>
+                            <NumberInput label="Qty" size="xs" min={0} value={line.quantity} onChange={(v) => updateItemLine(realIdx, 'quantity', v || 0)} />
+                            <NumberInput label="Rate" size="xs" min={0} value={line.rate} onChange={(v) => updateItemLine(realIdx, 'rate', v || 0)} />
+                          </Group>
+                          <Text size="xs" ta="right" fw={500} mt={4}>{lineAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
+                        </Card>
+                      );
+                    })}
+                  </Stack>
+                ) : (
+                  <Table withTableBorder>
+                    <Table.Thead>
                       <Table.Tr>
-                        <Table.Td colSpan={5}>
-                          <Text size="sm" c="dimmed" ta="center" py="sm">No input items. Add rows or select an output item with an active BOM.</Text>
-                        </Table.Td>
+                        <Table.Th style={{ minWidth: 200 }}>Item</Table.Th>
+                        <Table.Th style={{ width: 100 }}>Qty</Table.Th>
+                        <Table.Th style={{ width: 120 }}>Rate</Table.Th>
+                        <Table.Th style={{ width: 120, textAlign: 'right' }}>Amount</Table.Th>
+                        <Table.Th style={{ width: 40 }}></Table.Th>
                       </Table.Tr>
-                    ) : (
-                      inputLines.map((line, i) => {
-                        const realIdx = i + 1; // offset by 1 since index 0 is output
+                    </Table.Thead>
+                    <Table.Tbody>
+                      {inputLines.map((line, i) => {
+                        const realIdx = i + 1;
                         const lineAmount = line.quantity * line.rate;
                         return (
                           <Table.Tr key={realIdx}>
@@ -593,25 +645,22 @@ export default function VoucherCreate() {
                             </Table.Td>
                           </Table.Tr>
                         );
-                      })
-                    )}
-                  </Table.Tbody>
-                </Table>
+                      })}
+                    </Table.Tbody>
+                  </Table>
+                )}
 
                 {/* Cost Summary */}
-                <SimpleGrid cols={2} mt="sm">
-                  <div />
-                  <Stack gap={4}>
-                    <Group justify="space-between">
-                      <Text size="sm">Total Input Cost:</Text>
-                      <Text size="sm" fw={600}>{totalInputCost.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
-                    </Group>
-                    <Group justify="space-between">
-                      <Text size="sm">Output Cost / Unit:</Text>
-                      <Text size="sm" fw={700} c="green">{outputCostPerUnit.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
-                    </Group>
-                  </Stack>
-                </SimpleGrid>
+                <Stack gap={4} mt="sm">
+                  <Group justify="space-between">
+                    <Text size="sm">Total Input Cost:</Text>
+                    <Text size="sm" fw={600}>{totalInputCost.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
+                  </Group>
+                  <Group justify="space-between">
+                    <Text size="sm">Output Cost / Unit:</Text>
+                    <Text size="sm" fw={700} c="green">{outputCostPerUnit.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
+                  </Group>
+                </Stack>
               </Card>
             </Stack>
           );
@@ -649,7 +698,7 @@ export default function VoucherCreate() {
                             size="sm"
                             min={0}
                             placeholder="Rate"
-                            value={entry.rate ?? ''}
+                            value={entry.rate ?? (item.salesPrice || '')}
                             onChange={(v) => updateQuickInput(item._id, 'rate', v || '')}
                             w={isMobile ? 90 : 120}
                             hideControls
@@ -710,24 +759,13 @@ export default function VoucherCreate() {
                 <Text fw={600}>Line Items</Text>
                 <Button size="xs" variant="light" leftSection={<IconPlus size={14} />} onClick={addItemLine}>Add Row</Button>
               </Group>
-              <Table withTableBorder>
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th style={{ minWidth: 200 }}>Item</Table.Th>
-                    <Table.Th style={{ width: 80 }}>Qty</Table.Th>
-                    <Table.Th style={{ width: 100 }}>Rate</Table.Th>
-                    <Table.Th style={{ width: 80 }}>Disc</Table.Th>
-                    <Table.Th style={{ width: 70 }}>GST%</Table.Th>
-                    <Table.Th style={{ width: 100, textAlign: 'right' }}>Amount</Table.Th>
-                    <Table.Th style={{ width: 40 }}></Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
+              {isMobile ? (
+                <Stack gap="xs">
                   {itemLines.map((line, idx) => {
                     const calc = itemCalcs.lines[idx] || {};
                     return (
-                      <Table.Tr key={idx}>
-                        <Table.Td>
+                      <Card key={idx} withBorder padding="xs">
+                        <Group justify="space-between" wrap="nowrap" mb={4}>
                           <Select
                             data={itemData}
                             value={line.itemId || null}
@@ -735,43 +773,84 @@ export default function VoucherCreate() {
                             searchable
                             size="xs"
                             placeholder="Select item..."
+                            style={{ flex: 1 }}
                           />
-                        </Table.Td>
-                        <Table.Td>
-                          <NumberInput size="xs" min={0} value={line.quantity} onChange={(v) => updateItemLine(idx, 'quantity', v || 0)} />
-                        </Table.Td>
-                        <Table.Td>
-                          <NumberInput size="xs" min={0} value={line.rate} onChange={(v) => updateItemLine(idx, 'rate', v || 0)} />
-                        </Table.Td>
-                        <Table.Td>
-                          <NumberInput size="xs" min={0} value={line.discount} onChange={(v) => updateItemLine(idx, 'discount', v || 0)} />
-                        </Table.Td>
-                        <Table.Td>
-                          <NumberInput size="xs" min={0} max={100} value={line.gstRate} onChange={(v) => updateItemLine(idx, 'gstRate', v || 0)} />
-                        </Table.Td>
-                        <Table.Td style={{ textAlign: 'right' }}>
-                          <Text size="sm" fw={500}>{(calc.lineTotal || 0).toLocaleString('en-IN')}</Text>
-                        </Table.Td>
-                        <Table.Td>
                           <ActionIcon variant="subtle" color="red" size="sm" onClick={() => removeItemLine(idx)}>
                             <IconTrash size={14} />
                           </ActionIcon>
-                        </Table.Td>
-                      </Table.Tr>
+                        </Group>
+                        <SimpleGrid cols={2} spacing="xs">
+                          <NumberInput label="Qty" size="xs" min={0} value={line.quantity} onChange={(v) => updateItemLine(idx, 'quantity', v || 0)} />
+                          <NumberInput label="Rate" size="xs" min={0} value={line.rate} onChange={(v) => updateItemLine(idx, 'rate', v || 0)} />
+                          <NumberInput label="Disc" size="xs" min={0} value={line.discount} onChange={(v) => updateItemLine(idx, 'discount', v || 0)} />
+                          <NumberInput label="GST%" size="xs" min={0} max={100} value={line.gstRate} onChange={(v) => updateItemLine(idx, 'gstRate', v || 0)} />
+                        </SimpleGrid>
+                        <Text size="xs" ta="right" fw={500} mt={4}>{(calc.lineTotal || 0).toLocaleString('en-IN')}</Text>
+                      </Card>
                     );
                   })}
-                </Table.Tbody>
-              </Table>
-
-              <SimpleGrid cols={2} mt="sm">
-                <div />
-                <Stack gap={4}>
-                  <Group justify="space-between"><Text size="sm">Subtotal:</Text><Text size="sm">{itemCalcs.subtotal.toLocaleString('en-IN')}</Text></Group>
-                  <Group justify="space-between"><Text size="sm">Discount:</Text><Text size="sm">{itemCalcs.totalDiscount.toLocaleString('en-IN')}</Text></Group>
-                  <Group justify="space-between"><Text size="sm">Tax:</Text><Text size="sm">{itemCalcs.totalTax.toLocaleString('en-IN')}</Text></Group>
-                  <Group justify="space-between"><Text fw={700}>Grand Total:</Text><Text fw={700}>{itemCalcs.grandTotal.toLocaleString('en-IN')}</Text></Group>
                 </Stack>
-              </SimpleGrid>
+              ) : (
+                <Table withTableBorder>
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th style={{ minWidth: 200 }}>Item</Table.Th>
+                      <Table.Th style={{ width: 80 }}>Qty</Table.Th>
+                      <Table.Th style={{ width: 100 }}>Rate</Table.Th>
+                      <Table.Th style={{ width: 80 }}>Disc</Table.Th>
+                      <Table.Th style={{ width: 70 }}>GST%</Table.Th>
+                      <Table.Th style={{ width: 100, textAlign: 'right' }}>Amount</Table.Th>
+                      <Table.Th style={{ width: 40 }}></Table.Th>
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {itemLines.map((line, idx) => {
+                      const calc = itemCalcs.lines[idx] || {};
+                      return (
+                        <Table.Tr key={idx}>
+                          <Table.Td>
+                            <Select
+                              data={itemData}
+                              value={line.itemId || null}
+                              onChange={(v) => updateItemLine(idx, 'itemId', v)}
+                              searchable
+                              size="xs"
+                              placeholder="Select item..."
+                            />
+                          </Table.Td>
+                          <Table.Td>
+                            <NumberInput size="xs" min={0} value={line.quantity} onChange={(v) => updateItemLine(idx, 'quantity', v || 0)} />
+                          </Table.Td>
+                          <Table.Td>
+                            <NumberInput size="xs" min={0} value={line.rate} onChange={(v) => updateItemLine(idx, 'rate', v || 0)} />
+                          </Table.Td>
+                          <Table.Td>
+                            <NumberInput size="xs" min={0} value={line.discount} onChange={(v) => updateItemLine(idx, 'discount', v || 0)} />
+                          </Table.Td>
+                          <Table.Td>
+                            <NumberInput size="xs" min={0} max={100} value={line.gstRate} onChange={(v) => updateItemLine(idx, 'gstRate', v || 0)} />
+                          </Table.Td>
+                          <Table.Td style={{ textAlign: 'right' }}>
+                            <Text size="sm" fw={500}>{(calc.lineTotal || 0).toLocaleString('en-IN')}</Text>
+                          </Table.Td>
+                          <Table.Td>
+                            <ActionIcon variant="subtle" color="red" size="sm" onClick={() => removeItemLine(idx)}>
+                              <IconTrash size={14} />
+                            </ActionIcon>
+                          </Table.Td>
+                        </Table.Tr>
+                      );
+                    })}
+                  </Table.Tbody>
+                </Table>
+              )}
+
+              <Stack gap={4} mt="sm">
+                <Group justify="space-between"><Text size="sm">Subtotal:</Text><Text size="sm">{itemCalcs.subtotal.toLocaleString('en-IN')}</Text></Group>
+                <Group justify="space-between"><Text size="sm">Discount:</Text><Text size="sm">{itemCalcs.totalDiscount.toLocaleString('en-IN')}</Text></Group>
+                <Group justify="space-between"><Text size="sm">Tax:</Text><Text size="sm">{itemCalcs.totalTax.toLocaleString('en-IN')}</Text></Group>
+                <Group justify="space-between"><Text fw={700}>Grand Total:</Text><Text fw={700}>{itemCalcs.grandTotal.toLocaleString('en-IN')}</Text></Group>
+              </Stack>
             </Card>
           )
         )}
@@ -783,74 +862,120 @@ export default function VoucherCreate() {
               <Text fw={600}>{isSimpleMode ? 'Payment Details' : 'Journal Entries'}</Text>
               <Button size="xs" variant="light" leftSection={<IconPlus size={14} />} onClick={addAccountLine}>Add Row</Button>
             </Group>
-            <Table withTableBorder>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th style={{ minWidth: 200 }}>Account</Table.Th>
-                  {isSimpleMode ? (
-                    <Table.Th style={{ width: 150 }}>Amount</Table.Th>
-                  ) : (
-                    <>
-                      <Table.Th style={{ width: 120 }}>Debit</Table.Th>
-                      <Table.Th style={{ width: 120 }}>Credit</Table.Th>
-                    </>
-                  )}
-                  <Table.Th style={{ minWidth: 150 }}>Narration</Table.Th>
-                  <Table.Th style={{ width: 40 }}></Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
+            {isMobile ? (
+              <Stack gap="xs">
                 {accountLines.map((line, idx) => (
-                  <Table.Tr key={idx}>
-                    <Table.Td>
+                  <Card key={idx} withBorder padding="xs">
+                    <Group justify="space-between" wrap="nowrap" mb={4}>
                       <Select
                         data={accountData}
                         value={line.accountId || null}
                         onChange={(v) => updateAccountLine(idx, 'accountId', v)}
                         searchable
                         size="xs"
-                        placeholder={isSimpleMode ? (voucherType === 'receipt' ? "Select Cash/Bank Account" : "Select Payment Source") : "Select account..."}
+                        placeholder={isSimpleMode ? (voucherType === 'receipt' ? "Cash/Bank Account" : "Payment Source") : "Select account..."}
+                        style={{ flex: 1 }}
                       />
-                    </Table.Td>
-                    {isSimpleMode ? (
-                      <Table.Td>
-                        <NumberInput 
-                          size="xs" 
-                          min={0} 
-                          value={voucherType === 'receipt' ? line.debit : line.credit} 
-                          onChange={(v) => {
-                            if (voucherType === 'receipt') {
-                              updateAccountLine(idx, 'debit', v || 0);
-                              updateAccountLine(idx, 'credit', 0);
-                            } else {
-                              updateAccountLine(idx, 'credit', v || 0);
-                              updateAccountLine(idx, 'debit', 0);
-                            }
-                          }} 
-                        />
-                      </Table.Td>
-                    ) : (
-                      <>
-                        <Table.Td>
-                          <NumberInput size="xs" min={0} value={line.debit} onChange={(v) => updateAccountLine(idx, 'debit', v || 0)} />
-                        </Table.Td>
-                        <Table.Td>
-                          <NumberInput size="xs" min={0} value={line.credit} onChange={(v) => updateAccountLine(idx, 'credit', v || 0)} />
-                        </Table.Td>
-                      </>
-                    )}
-                    <Table.Td>
-                      <TextInput size="xs" value={line.narration} onChange={(e) => updateAccountLine(idx, 'narration', e.target.value)} />
-                    </Table.Td>
-                    <Table.Td>
                       <ActionIcon variant="subtle" color="red" size="sm" onClick={() => removeAccountLine(idx)}>
                         <IconTrash size={14} />
                       </ActionIcon>
-                    </Table.Td>
-                  </Table.Tr>
+                    </Group>
+                    {isSimpleMode ? (
+                      <NumberInput
+                        label="Amount"
+                        size="xs"
+                        min={0}
+                        value={voucherType === 'receipt' ? line.debit : line.credit}
+                        onChange={(v) => {
+                          if (voucherType === 'receipt') {
+                            updateAccountLine(idx, 'debit', v || 0);
+                            updateAccountLine(idx, 'credit', 0);
+                          } else {
+                            updateAccountLine(idx, 'credit', v || 0);
+                            updateAccountLine(idx, 'debit', 0);
+                          }
+                        }}
+                      />
+                    ) : (
+                      <Group grow>
+                        <NumberInput label="Debit" size="xs" min={0} value={line.debit} onChange={(v) => updateAccountLine(idx, 'debit', v || 0)} />
+                        <NumberInput label="Credit" size="xs" min={0} value={line.credit} onChange={(v) => updateAccountLine(idx, 'credit', v || 0)} />
+                      </Group>
+                    )}
+                    <TextInput label="Narration" size="xs" mt={4} value={line.narration} onChange={(e) => updateAccountLine(idx, 'narration', e.target.value)} />
+                  </Card>
                 ))}
-              </Table.Tbody>
-            </Table>
+              </Stack>
+            ) : (
+              <Table withTableBorder>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th style={{ minWidth: 200 }}>Account</Table.Th>
+                    {isSimpleMode ? (
+                      <Table.Th style={{ width: 150 }}>Amount</Table.Th>
+                    ) : (
+                      <>
+                        <Table.Th style={{ width: 120 }}>Debit</Table.Th>
+                        <Table.Th style={{ width: 120 }}>Credit</Table.Th>
+                      </>
+                    )}
+                    <Table.Th style={{ minWidth: 150 }}>Narration</Table.Th>
+                    <Table.Th style={{ width: 40 }}></Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {accountLines.map((line, idx) => (
+                    <Table.Tr key={idx}>
+                      <Table.Td>
+                        <Select
+                          data={accountData}
+                          value={line.accountId || null}
+                          onChange={(v) => updateAccountLine(idx, 'accountId', v)}
+                          searchable
+                          size="xs"
+                          placeholder={isSimpleMode ? (voucherType === 'receipt' ? "Select Cash/Bank Account" : "Select Payment Source") : "Select account..."}
+                        />
+                      </Table.Td>
+                      {isSimpleMode ? (
+                        <Table.Td>
+                          <NumberInput
+                            size="xs"
+                            min={0}
+                            value={voucherType === 'receipt' ? line.debit : line.credit}
+                            onChange={(v) => {
+                              if (voucherType === 'receipt') {
+                                updateAccountLine(idx, 'debit', v || 0);
+                                updateAccountLine(idx, 'credit', 0);
+                              } else {
+                                updateAccountLine(idx, 'credit', v || 0);
+                                updateAccountLine(idx, 'debit', 0);
+                              }
+                            }}
+                          />
+                        </Table.Td>
+                      ) : (
+                        <>
+                          <Table.Td>
+                            <NumberInput size="xs" min={0} value={line.debit} onChange={(v) => updateAccountLine(idx, 'debit', v || 0)} />
+                          </Table.Td>
+                          <Table.Td>
+                            <NumberInput size="xs" min={0} value={line.credit} onChange={(v) => updateAccountLine(idx, 'credit', v || 0)} />
+                          </Table.Td>
+                        </>
+                      )}
+                      <Table.Td>
+                        <TextInput size="xs" value={line.narration} onChange={(e) => updateAccountLine(idx, 'narration', e.target.value)} />
+                      </Table.Td>
+                      <Table.Td>
+                        <ActionIcon variant="subtle" color="red" size="sm" onClick={() => removeAccountLine(idx)}>
+                          <IconTrash size={14} />
+                        </ActionIcon>
+                      </Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            )}
 
             <Group justify="flex-end" mt="sm" gap="lg">
               {isSimpleMode ? (

@@ -6,6 +6,7 @@ import PageHeader from '../components/PageHeader.jsx';
 import VoucherList from '../components/VoucherList.jsx';
 import VoucherDetailModal from '../components/VoucherDetailModal.jsx';
 import api from '../services/api.js';
+import { usePermission } from '../hooks/usePermission.js';
 
 const VOUCHER_TYPES = [
   { value: 'sales_invoice', label: 'Sales Invoice' },
@@ -27,6 +28,7 @@ const VOUCHER_TYPES = [
 
 export default function Vouchers() {
   const navigate = useNavigate();
+  const { isOwnerOrAdmin, can } = usePermission();
   const [vouchers, setVouchers] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -58,12 +60,15 @@ export default function Vouchers() {
     } catch { /* ignore */ }
   }
 
+  const allowedTypes = VOUCHER_TYPES.filter((t) => can(t.value, 'read') || can(t.value, 'write') || can(t.value, 'delete'));
+  const canCreateAny = isOwnerOrAdmin || allowedTypes.some((t) => can(t.value, 'write'));
+
   return (
     <div>
-      <PageHeader title="All Vouchers" count={total} actionLabel="New Voucher" onAction={() => navigate('/vouchers/new')}>
+      <PageHeader title="All Vouchers" count={total} actionLabel={canCreateAny ? "New Voucher" : null} onAction={() => navigate('/vouchers/new')}>
         <Select
           placeholder="Filter Type"
-          data={VOUCHER_TYPES}
+          data={allowedTypes}
           value={typeFilter}
           onChange={(v) => { setTypeFilter(v); setPage(1); }}
           clearable

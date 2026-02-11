@@ -35,10 +35,14 @@ import {
 import DataTable from '../components/DataTable.jsx';
 import ConfirmDelete from '../components/ConfirmDelete.jsx';
 import api from '../services/api.js';
+import { usePermission } from '../hooks/usePermission.js';
 
 const STATUS_COLORS = { draft: 'gray', active: 'green', archived: 'orange' };
 
 export default function Boms() {
+  const { can } = usePermission();
+  const canWrite = can('bom', 'write');
+  const canDelete = can('bom', 'delete');
   const [boms, setBoms] = useState([]);
   const [items, setItems] = useState([]);
   const [mcs, setMcs] = useState([]);
@@ -83,7 +87,7 @@ export default function Boms() {
       const [bomsRes, itemsRes, mcsRes] = await Promise.all([
         api.get('/boms'),
         api.get('/items'),
-        api.get('/material-centres'),
+        api.get('/material-centres/lookup'),
       ]);
       setBoms(bomsRes.data.data.boms);
       setItems(itemsRes.data.data.items);
@@ -288,19 +292,19 @@ export default function Boms() {
           <Menu.Dropdown>
             {r.status === 'draft' && (
               <>
-                <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => openEdit(r)}>Edit</Menu.Item>
-                <Menu.Item leftSection={<IconCheck size={14} />} color="green" onClick={() => handleActivate(r._id)}>Activate</Menu.Item>
-                <Menu.Item leftSection={<IconTrash size={14} />} color="red" onClick={() => setDeleteTarget(r)}>Delete</Menu.Item>
+                {canWrite && <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => openEdit(r)}>Edit</Menu.Item>}
+                {canWrite && <Menu.Item leftSection={<IconCheck size={14} />} color="green" onClick={() => handleActivate(r._id)}>Activate</Menu.Item>}
+                {canDelete && <Menu.Item leftSection={<IconTrash size={14} />} color="red" onClick={() => setDeleteTarget(r)}>Delete</Menu.Item>}
               </>
             )}
             {r.status === 'active' && (
               <>
-                <Menu.Item leftSection={<IconArchive size={14} />} onClick={() => handleArchive(r._id)}>Archive</Menu.Item>
-                <Menu.Item leftSection={<IconCopy size={14} />} onClick={() => handleNewVersion(r._id)}>New Version</Menu.Item>
+                {canWrite && <Menu.Item leftSection={<IconArchive size={14} />} onClick={() => handleArchive(r._id)}>Archive</Menu.Item>}
+                {canWrite && <Menu.Item leftSection={<IconCopy size={14} />} onClick={() => handleNewVersion(r._id)}>New Version</Menu.Item>}
               </>
             )}
             {r.status === 'archived' && (
-              <Menu.Item leftSection={<IconCopy size={14} />} onClick={() => handleNewVersion(r._id)}>New Version</Menu.Item>
+              canWrite && <Menu.Item leftSection={<IconCopy size={14} />} onClick={() => handleNewVersion(r._id)}>New Version</Menu.Item>
             )}
             <Menu.Item leftSection={<IconHistory size={14} />} onClick={() => openVersionHistory(r.outputItemId?._id || r.outputItemId)}>
               Version History
@@ -316,12 +320,12 @@ export default function Boms() {
       {isMobile ? (
         <Stack gap="sm" mb="lg">
           <Title order={3}>Bill of Materials</Title>
-          <Button leftSection={<IconPlus size={16} />} onClick={openCreate} fullWidth>New BOM</Button>
+          {canWrite && <Button leftSection={<IconPlus size={16} />} onClick={openCreate} fullWidth>New BOM</Button>}
         </Stack>
       ) : (
         <Group justify="space-between" mb="lg">
           <Title order={2}>Bill of Materials</Title>
-          <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>New BOM</Button>
+          {canWrite && <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>New BOM</Button>}
         </Group>
       )}
 
@@ -373,8 +377,8 @@ export default function Boms() {
                 </Group>
               </Stack>
               <Group gap={4}>
-                <ActionIcon variant="subtle" onClick={() => openEdit(b)}><IconPencil size={16} /></ActionIcon>
-                <ActionIcon variant="subtle" color="red" onClick={() => setDeleteTarget(b)}><IconTrash size={16} /></ActionIcon>
+                {canWrite && <ActionIcon variant="subtle" onClick={() => openEdit(b)}><IconPencil size={16} /></ActionIcon>}
+                {canDelete && <ActionIcon variant="subtle" color="red" onClick={() => setDeleteTarget(b)}><IconTrash size={16} /></ActionIcon>}
               </Group>
             </Group>
           </Card>
@@ -382,7 +386,7 @@ export default function Boms() {
       />
 
       {/* Create/Edit Modal */}
-      <Modal opened={modalOpen} onClose={() => setModalOpen(false)} title={editingId ? 'Edit BOM' : 'New BOM'} centered size="lg">
+      <Modal opened={modalOpen} onClose={() => setModalOpen(false)} title={editingId ? 'Edit BOM' : 'New BOM'} centered size="lg" fullScreen={isMobile}>
         {error && <Alert color="red" variant="light" mb="sm">{error}</Alert>}
         <form onSubmit={form.onSubmit(handleSubmit)}>
           <Stack>
@@ -466,7 +470,7 @@ export default function Boms() {
       </Modal>
 
       {/* Version History Modal */}
-      <Modal opened={!!historyItemId} onClose={() => setHistoryItemId(null)} title="Version History" centered>
+      <Modal opened={!!historyItemId} onClose={() => setHistoryItemId(null)} title="Version History" centered fullScreen={isMobile}>
         {historyLoading ? (
           <Center py="md"><Loader size="sm" /></Center>
         ) : historyVersions.length === 0 ? (

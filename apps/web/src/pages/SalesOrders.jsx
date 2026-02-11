@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Center, Loader, Pagination, Select, Box, Card, Stack, Group, Text, ActionIcon } from '@mantine/core';
+import { Center, Loader, Pagination, Select, Box, Stack, Group, Text, ActionIcon } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { IconTrash } from '@tabler/icons-react';
@@ -8,8 +8,14 @@ import PageHeader from '../components/PageHeader.jsx';
 import VoucherDetailModal from '../components/VoucherDetailModal.jsx';
 import ConfirmDelete from '../components/ConfirmDelete.jsx';
 import api from '../services/api.js';
+import { usePermission } from '../hooks/usePermission.js';
 
 function fmtDate(d) {
+  return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function fmtDateTime(d) {
+  if (!d) return '-';
   return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
@@ -17,7 +23,7 @@ function fmtCurrency(n) {
   return (n || 0).toLocaleString('en-IN', { style: 'currency', currency: 'INR' });
 }
 
-function OrderCard({ voucher, onView, onDelete }) {
+function OrderCard({ voucher, onView, onDelete, canDelete }) {
   const items = voucher.lineItems || [];
   const shownItems = items.slice(0, 3);
   const extraCount = items.length - shownItems.length;
@@ -27,23 +33,23 @@ function OrderCard({ voucher, onView, onDelete }) {
       p="sm"
       style={{
         cursor: 'pointer',
-        transition: 'background-color 0.2s',
         backgroundColor: 'var(--app-surface-elevated)',
+        borderRadius: 'var(--mantine-radius-md)',
       }}
-      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--app-surface-elevated)'}
-      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--app-surface-elevated)'}
       onClick={() => onView(voucher)}
     >
       <Group justify="space-between" wrap="nowrap" align="center">
         <Box style={{ flex: 1, minWidth: 0 }}>
-          <Group justify="space-between" wrap="nowrap" align="center" mb={4}>
-            <Text size="sm" fw={600} lineClamp={1}>{voucher.partyId?.name || 'No Party'}</Text>
+          <Group justify="space-between" wrap="nowrap" align="center" mb={6}>
+            <Group gap="xs" wrap="nowrap" style={{ minWidth: 0 }}>
+              <Text size="sm" fw={600} lineClamp={1}>{voucher.partyId?.name || 'No Party'}</Text>
+              {voucher.materialCentreId?.name && (
+                <Text size="xs" c="teal" fw={600} lineClamp={1}>
+                  [{voucher.materialCentreId.name}]
+                </Text>
+              )}
+            </Group>
           </Group>
-          {voucher.materialCentreId?.name && (
-            <Text size="xs" c="teal" fw={600} mb={6}>
-              {voucher.materialCentreId.name}
-            </Text>
-          )}
           <Stack gap={4}>
             {shownItems.map((li, i) => (
               <Group key={i} gap="xs" wrap="nowrap" justify="space-between">
@@ -59,8 +65,25 @@ function OrderCard({ voucher, onView, onDelete }) {
               <Text size="xs" c="dimmed">+{extraCount} more item{extraCount > 1 ? 's' : ''}</Text>
             )}
           </Stack>
+          <Box
+            mt={8}
+            pt={6}
+            style={{
+              borderTop: '1px solid var(--mantine-color-default-border)',
+              marginInline: 4,
+            }}
+          >
+            <Group gap="xs" wrap="nowrap" justify="space-between">
+              <Text size="xs" c="dimmed">
+                Added on: <Text span fw={600} c="dimmed">{fmtDateTime(voucher.createdAt)}</Text>
+              </Text>
+              <Text size="xs" fw={600} c="dimmed" lineClamp={1}>
+                {voucher.createdBy?.name || '-'}
+              </Text>
+            </Group>
+          </Box>
         </Box>
-        <ActionIcon
+        {canDelete && <ActionIcon
           variant="subtle"
           color="red"
           size="lg"
@@ -68,33 +91,32 @@ function OrderCard({ voucher, onView, onDelete }) {
           aria-label="Delete order"
         >
           <IconTrash size={18} />
-        </ActionIcon>
+        </ActionIcon>}
       </Group>
     </Box>
   );
 }
 
-function OrderGroup({ date, vouchers, onView, onDelete }) {
+function OrderGroup({ date, vouchers, onView, onDelete, canDelete }) {
   return (
     <Box mb="md">
       <Text c="dimmed" size="xs" fw={700} mb="xs" tt="uppercase" style={{ letterSpacing: 0.5 }}>
         {date}
       </Text>
-      <Card padding={0} radius="md" style={{ background: 'transparent', border: 'none', boxShadow: 'none' }}>
-        <Stack gap="sm" style={{ background: 'var(--app-bg)' }}>
-          {vouchers.map((v, i) => (
-            <Box key={v._id}>
-              <OrderCard voucher={v} onView={onView} onDelete={onDelete} />
-            </Box>
-          ))}
-        </Stack>
-      </Card>
+      <Stack gap="sm">
+        {vouchers.map((v) => (
+          <OrderCard key={v._id} voucher={v} onView={onView} onDelete={onDelete} canDelete={canDelete} />
+        ))}
+      </Stack>
     </Box>
   );
 }
 
 export default function SalesOrders() {
   const navigate = useNavigate();
+  const { can } = usePermission();
+  const canWrite = can('sales_order', 'write');
+  const canDeleteSO = can('sales_order', 'delete');
   const [vouchers, setVouchers] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -108,7 +130,7 @@ export default function SalesOrders() {
   const isMobile = useMediaQuery('(max-width: 48em)');
 
   useEffect(() => {
-    api.get('/material-centres').then(({ data }) => setMcs(data.data.materialCentres)).catch(() => {});
+    api.get('/material-centres/lookup').then(({ data }) => setMcs(data.data.materialCentres)).catch(() => {});
   }, []);
 
   useEffect(() => { loadVouchers(); }, [page, mcFilter]);
@@ -164,7 +186,7 @@ export default function SalesOrders() {
       <PageHeader
         title="Sales Orders"
         count={total}
-        actionLabel="New Order"
+        actionLabel={canWrite ? "New Order" : null}
         onAction={() => navigate('/vouchers/new?type=sales_order')}
       >
         <Select
@@ -186,7 +208,7 @@ export default function SalesOrders() {
       ) : (
         <>
           {Object.entries(grouped).map(([date, list]) => (
-            <OrderGroup key={date} date={date} vouchers={list} onView={viewDetail} onDelete={setDeleteTarget} />
+            <OrderGroup key={date} date={date} vouchers={list} onView={viewDetail} onDelete={setDeleteTarget} canDelete={canDeleteSO} />
           ))}
           {totalPages > 1 && (
             <Center mt="md">

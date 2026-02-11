@@ -6,6 +6,7 @@ import Vouchers from './pages/Vouchers.jsx';
 import VoucherCreate from './pages/VoucherCreate.jsx';
 import Inventory from './pages/Inventory.jsx';
 import Items from './pages/Items.jsx';
+import ItemLedger from './pages/ItemLedger.jsx';
 import Parties from './pages/Parties.jsx';
 import PartyLedger from './pages/PartyLedger.jsx';
 import Accounting from './pages/Accounting.jsx';
@@ -15,7 +16,9 @@ import Productions from './pages/Productions.jsx';
 import Receipts from './pages/Receipts.jsx';
 import SalesOrders from './pages/SalesOrders.jsx';
 import PurchaseOrders from './pages/PurchaseOrders.jsx';
+import Members from './pages/Members.jsx';
 import { useAuthStore } from './store/authStore.js';
+import { usePermission } from './hooks/usePermission.js';
 
 function ProtectedRoute({ children }) {
   const accessToken = useAuthStore((s) => s.accessToken);
@@ -26,6 +29,36 @@ function ProtectedRoute({ children }) {
 function PublicRoute({ children }) {
   const accessToken = useAuthStore((s) => s.accessToken);
   if (accessToken) return <Navigate to="/" replace />;
+  return children;
+}
+
+function PermissionRoute({ module, children }) {
+  const { canAny } = usePermission();
+  if (module && !canAny(module)) return <Navigate to="/" replace />;
+  return children;
+}
+
+function VoucherRoute({ children }) {
+  const { can } = usePermission();
+  const voucherModules = [
+    'sales_invoice',
+    'purchase_invoice',
+    'sales_return',
+    'purchase_return',
+    'payment',
+    'receipt',
+    'journal',
+    'contra',
+    'stock_transfer',
+    'grn',
+    'delivery_note',
+    'production',
+    'sales_order',
+    'purchase_order',
+    'physical_stock',
+  ];
+  const canAnyVoucher = voucherModules.some((m) => can(m, 'read') || can(m, 'write') || can(m, 'delete'));
+  if (!canAnyVoucher) return <Navigate to="/" replace />;
   return children;
 }
 
@@ -56,20 +89,22 @@ export const router = createBrowserRouter([
     ),
     children: [
       { index: true, element: <Dashboard /> },
-      { path: 'items', element: <Items /> },
-      { path: 'boms', element: <Boms /> },
-      { path: 'productions', element: <Productions /> },
-      { path: 'sales-orders', element: <SalesOrders /> },
-      { path: 'purchase-orders', element: <PurchaseOrders /> },
-      { path: 'sales-invoices', element: <SalesInvoices /> },
-      { path: 'receipts', element: <Receipts /> },
-      { path: 'vouchers', element: <Vouchers /> },
-      { path: 'vouchers/new', element: <VoucherCreate /> },
-      { path: 'vouchers/:id/edit', element: <VoucherCreate /> },
-      { path: 'inventory', element: <Inventory /> },
-      { path: 'parties', element: <Parties /> },
-      { path: 'parties/:id/ledger', element: <PartyLedger /> },
-      { path: 'accounting', element: <Accounting /> },
+      { path: 'items', element: <PermissionRoute module="item"><Items /></PermissionRoute> },
+      { path: 'items/:id/ledger', element: <PermissionRoute module="item"><ItemLedger /></PermissionRoute> },
+      { path: 'boms', element: <PermissionRoute module="bom"><Boms /></PermissionRoute> },
+      { path: 'productions', element: <PermissionRoute module="production"><Productions /></PermissionRoute> },
+      { path: 'sales-orders', element: <PermissionRoute module="sales_order"><SalesOrders /></PermissionRoute> },
+      { path: 'purchase-orders', element: <PermissionRoute module="purchase_order"><PurchaseOrders /></PermissionRoute> },
+      { path: 'sales-invoices', element: <PermissionRoute module="sales_invoice"><SalesInvoices /></PermissionRoute> },
+      { path: 'receipts', element: <PermissionRoute module="receipt"><Receipts /></PermissionRoute> },
+      { path: 'vouchers', element: <VoucherRoute><Vouchers /></VoucherRoute> },
+      { path: 'vouchers/new', element: <VoucherRoute><VoucherCreate /></VoucherRoute> },
+      { path: 'vouchers/:id/edit', element: <VoucherRoute><VoucherCreate /></VoucherRoute> },
+      { path: 'inventory', element: <PermissionRoute module="inventory"><Inventory /></PermissionRoute> },
+      { path: 'parties', element: <PermissionRoute module="party"><Parties /></PermissionRoute> },
+      { path: 'parties/:id/ledger', element: <PermissionRoute module="party"><PartyLedger /></PermissionRoute> },
+      { path: 'accounting', element: <PermissionRoute module="accounting"><Accounting /></PermissionRoute> },
+      { path: 'members', element: <PermissionRoute module="member"><Members /></PermissionRoute> },
       { path: 'settings', element: <Placeholder title="Settings" /> },
     ],
   },

@@ -7,10 +7,21 @@ export const useAuthStore = create((set) => ({
   currentBusinessId: localStorage.getItem('currentBusinessId') || null,
 
   setAuth: (user, accessToken, refreshToken) => {
+    const existingBusinessId = localStorage.getItem('currentBusinessId');
+    let nextBusinessId = existingBusinessId;
+    const businessIds = (user?.businesses || []).map((b) => String(b.businessId));
+    if (!nextBusinessId || !businessIds.includes(String(nextBusinessId))) {
+      nextBusinessId = businessIds[0] || null;
+    }
     localStorage.setItem('user', JSON.stringify(user));
     localStorage.setItem('accessToken', accessToken);
     localStorage.setItem('refreshToken', refreshToken);
-    set({ user, accessToken, refreshToken });
+    if (nextBusinessId) {
+      localStorage.setItem('currentBusinessId', nextBusinessId);
+    } else {
+      localStorage.removeItem('currentBusinessId');
+    }
+    set({ user, accessToken, refreshToken, currentBusinessId: nextBusinessId });
   },
 
   setTokens: (accessToken, refreshToken) => {

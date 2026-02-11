@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Modal, Stack, SimpleGrid, Text, Badge, Table, Group, Button, Textarea, Box, Card } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import api from '../services/api.js';
 
@@ -15,6 +16,7 @@ function fmtCurrency(n) {
 export default function ProductionDetailModal({ voucher, onClose, onUpdate }) {
   const [cancelModal, setCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
+  const isMobile = useMediaQuery('(max-width: 48em)');
 
   async function handleCancel() {
     if (!cancelReason.trim()) return;
@@ -39,7 +41,7 @@ export default function ProductionDetailModal({ voucher, onClose, onUpdate }) {
 
   return (
     <>
-      <Modal opened={!!voucher} onClose={onClose} title={voucher.voucherNumber} centered size="lg">
+      <Modal opened={!!voucher} onClose={onClose} title={voucher.voucherNumber} centered size="lg" fullScreen={isMobile}>
         <Stack>
           <SimpleGrid cols={2}>
             <Text size="sm"><strong>Date:</strong> {fmtDate(voucher.date)}</Text>
@@ -100,7 +102,7 @@ export default function ProductionDetailModal({ voucher, onClose, onUpdate }) {
             </Table.Tbody>
           </Table>
 
-          <Card withBorder padding="sm" radius="md" bg="gray.0">
+          <Card withBorder padding="sm" radius="md" bg="var(--app-surface-elevated)">
             <Text fw={600} size="sm" mb="xs">Cost Summary</Text>
             <SimpleGrid cols={2}>
               <Text size="sm">Total input cost</Text>

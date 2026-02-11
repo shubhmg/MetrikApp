@@ -40,7 +40,8 @@ function generateFYOptions() {
 }
 
 function formatAmt(n) {
-  if (!n) return '-';
+  if (n === 0) return '0.00';
+  if (n == null) return '-';
   return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
@@ -69,38 +70,6 @@ const VOUCHER_TYPE_LABELS = {
   delivery_note: 'Delivery Note',
   grn: 'GRN',
 };
-
-function MobileLedgerEntry({ row }) {
-  return (
-    <Box p="sm" style={{ borderBottom: '1px solid var(--mantine-color-gray-3)' }}>
-      <Group justify="space-between" mb={4}>
-        <Text size="xs" c="dimmed" style={{ fontVariantNumeric: 'tabular-nums' }}>
-          {dayjs(row.date).format('DD MMM YYYY')}
-        </Text>
-        <Text size="xs" ff="monospace" c="dimmed">{row.voucherNumber || '-'}</Text>
-      </Group>
-      <Text size="sm" fw={500} mb={2}>
-        {VOUCHER_TYPE_LABELS[row.voucherType] || row.voucherType}
-      </Text>
-      {row.narration && <Text size="xs" c="dimmed" lineClamp={1} mb={4}>{row.narration}</Text>}
-      <Group justify="space-between">
-        <Group gap="md">
-          {row.debit ? (
-            <Text size="sm" c="red.7" fw={500} style={{ fontVariantNumeric: 'tabular-nums' }}>
-              Dr {formatAmt(row.debit)}
-            </Text>
-          ) : null}
-          {row.credit ? (
-            <Text size="sm" c="green.7" fw={500} style={{ fontVariantNumeric: 'tabular-nums' }}>
-              Cr {formatAmt(row.credit)}
-            </Text>
-          ) : null}
-        </Group>
-        <BalanceText value={row.balance} size="xs" fw={500} />
-      </Group>
-    </Box>
-  );
-}
 
 export default function PartyLedger() {
   const { id } = useParams();
@@ -216,7 +185,7 @@ export default function PartyLedger() {
         <Box visibleFrom="sm">
           <Table striped highlightOnHover withTableBorder withColumnBorders verticalSpacing="sm">
             <Table.Thead>
-              <Table.Tr style={{ backgroundColor: 'var(--mantine-color-gray-1)' }}>
+              <Table.Tr style={{ backgroundColor: 'var(--app-surface-elevated)' }}>
                 <Table.Th style={{ width: 110 }}>Date</Table.Th>
                 <Table.Th>Particulars</Table.Th>
                 <Table.Th style={{ width: 140 }}>Voucher No.</Table.Th>

@@ -5,9 +5,12 @@ import PageHeader from '../components/PageHeader.jsx';
 import VoucherList from '../components/VoucherList.jsx';
 import VoucherDetailModal from '../components/VoucherDetailModal.jsx';
 import api from '../services/api.js';
+import { usePermission } from '../hooks/usePermission.js';
 
 export default function Receipts() {
   const navigate = useNavigate();
+  const { can } = usePermission();
+  const canWrite = can('receipt', 'write');
   const [vouchers, setVouchers] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -41,7 +44,7 @@ export default function Receipts() {
       <PageHeader 
         title="Receipts" 
         count={total} 
-        actionLabel="New Receipt" 
+        actionLabel={canWrite ? "New Receipt" : null}
         onAction={() => navigate('/vouchers/new?type=receipt')} 
       />
 

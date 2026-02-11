@@ -5,9 +5,12 @@ import PageHeader from '../components/PageHeader.jsx';
 import VoucherList from '../components/VoucherList.jsx';
 import VoucherDetailModal from '../components/VoucherDetailModal.jsx';
 import api from '../services/api.js';
+import { usePermission } from '../hooks/usePermission.js';
 
 export default function SalesInvoices() {
   const navigate = useNavigate();
+  const { can } = usePermission();
+  const canWrite = can('sales_invoice', 'write');
   const [vouchers, setVouchers] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -41,7 +44,7 @@ export default function SalesInvoices() {
       <PageHeader 
         title="Sales Invoices" 
         count={total} 
-        actionLabel="New Invoice" 
+        actionLabel={canWrite ? "New Invoice" : null}
         onAction={() => navigate('/vouchers/new?type=sales_invoice')} 
       />
 

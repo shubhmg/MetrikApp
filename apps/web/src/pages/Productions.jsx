@@ -5,6 +5,7 @@ import { useMediaQuery } from '@mantine/hooks';
 import PageHeader from '../components/PageHeader.jsx';
 import ProductionDetailModal from '../components/ProductionDetailModal.jsx';
 import api from '../services/api.js';
+import { usePermission } from '../hooks/usePermission.js';
 
 
 function fmtDate(d) {
@@ -68,6 +69,8 @@ function ProductionGroup({ date, vouchers, onClick }) {
 
 export default function Productions() {
   const navigate = useNavigate();
+  const { can } = usePermission();
+  const canWrite = can('production', 'write');
   const [vouchers, setVouchers] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -114,7 +117,7 @@ export default function Productions() {
       <PageHeader
         title="Productions"
         count={total}
-        actionLabel="New Production"
+        actionLabel={canWrite ? "New Production" : null}
         onAction={() => navigate('/vouchers/new?type=production')}
       >
         <Select

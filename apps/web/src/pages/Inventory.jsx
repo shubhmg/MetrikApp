@@ -26,6 +26,7 @@ import DataTable from '../components/DataTable.jsx';
 import ConfirmDelete from '../components/ConfirmDelete.jsx';
 import PhysicalStockModal from '../components/PhysicalStockModal.jsx';
 import api from '../services/api.js';
+import { usePermission } from '../hooks/usePermission.js';
 
 const MC_TYPES = [
   { value: 'factory', label: 'Factory' },
@@ -35,6 +36,10 @@ const MC_TYPES = [
 ];
 
 export default function Inventory() {
+  const { can } = usePermission();
+  const canWriteInv = can('inventory', 'write');
+  const canDeleteInv = can('inventory', 'delete');
+  const canWritePhysical = can('physical_stock', 'write');
   const [mcs, setMcs] = useState([]);
   const [groups, setGroups] = useState([]); // Needed for filter
   const [loading, setLoading] = useState(true);
@@ -157,8 +162,8 @@ export default function Inventory() {
       key: 'actions', label: '',
       render: (r) => (
         <Group gap={4}>
-          <ActionIcon variant="subtle" onClick={() => openMcEdit(r)}><IconPencil size={16} /></ActionIcon>
-          <ActionIcon variant="subtle" color="red" onClick={() => { setDeleteTarget(r); }}><IconTrash size={16} /></ActionIcon>
+          {canWriteInv && <ActionIcon variant="subtle" onClick={() => openMcEdit(r)}><IconPencil size={16} /></ActionIcon>}
+          {canDeleteInv && <ActionIcon variant="subtle" color="red" onClick={() => { setDeleteTarget(r); }}><IconTrash size={16} /></ActionIcon>}
         </Group>
       ),
     },
@@ -204,7 +209,7 @@ export default function Inventory() {
             </Group>
             <Group grow={isMobile}>
               <Button size="sm" variant="light" onClick={loadStockReport}>Refresh</Button>
-              <Button size="sm" variant="light" onClick={() => setPhysicalStockOpen(true)}>Physical Stock</Button>
+              {canWritePhysical && <Button size="sm" variant="light" onClick={() => setPhysicalStockOpen(true)}>Physical Stock</Button>}
             </Group>
           </Stack>
           <DataTable
@@ -232,7 +237,7 @@ export default function Inventory() {
 
         <Tabs.Panel value="centres">
           <Group justify="flex-end" mb="sm">
-            <Button leftSection={<IconPlus size={16} />} onClick={openMcCreate} fullWidth={isMobile}>Add Centre</Button>
+            {canWriteInv && <Button leftSection={<IconPlus size={16} />} onClick={openMcCreate} fullWidth={isMobile}>Add Centre</Button>}
           </Group>
           <DataTable
             columns={mcColumns}
@@ -250,8 +255,8 @@ export default function Inventory() {
                     </Group>
                   </div>
                   <Group gap={4}>
-                    <ActionIcon variant="subtle" onClick={() => openMcEdit(r)}><IconPencil size={16} /></ActionIcon>
-                    <ActionIcon variant="subtle" color="red" onClick={() => { setDeleteTarget(r); }}><IconTrash size={16} /></ActionIcon>
+                    {canWriteInv && <ActionIcon variant="subtle" onClick={() => openMcEdit(r)}><IconPencil size={16} /></ActionIcon>}
+                    {canDeleteInv && <ActionIcon variant="subtle" color="red" onClick={() => { setDeleteTarget(r); }}><IconTrash size={16} /></ActionIcon>}
                   </Group>
                 </Group>
               </Card>
@@ -261,7 +266,7 @@ export default function Inventory() {
       </Tabs>
 
       {/* Material Centre Modal */}
-      <Modal opened={modalType === 'mc'} onClose={() => setModalType(null)} title={editingId ? 'Edit Material Centre' : 'New Material Centre'} centered>
+      <Modal opened={modalType === 'mc'} onClose={() => setModalType(null)} title={editingId ? 'Edit Material Centre' : 'New Material Centre'} centered fullScreen={isMobile}>
         {error && <Alert color="red" variant="light" mb="sm">{error}</Alert>}
         <form onSubmit={mcForm.onSubmit(handleMcSubmit)}>
           <Stack>

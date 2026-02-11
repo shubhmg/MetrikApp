@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useMediaQuery } from '@mantine/hooks';
 import { Outlet, NavLink as RouterNavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -29,74 +29,38 @@ import {
   IconTool,
   IconClipboardList,
   IconClipboardCheck,
-  IconDots,
   IconSun,
   IconMoon,
   IconReceipt,
   IconPlus,
+  IconUsersGroup,
 } from '@tabler/icons-react';
 import { useAuth } from '../../hooks/useAuth.js';
+import { usePermission } from '../../hooks/usePermission.js';
 
-const NAV_ITEMS = [
-  { path: '/', label: 'Dashboard', icon: IconLayoutDashboard },
+const ALL_NAV_ITEMS = [
+  { path: '/', label: 'Dashboard', icon: IconLayoutDashboard, module: 'dashboard' },
   { group: 'Sales', items: [
-    { path: '/sales-orders', label: 'Sales Orders', icon: IconClipboardList },
-    { path: '/sales-invoices', label: 'Sales Invoices', icon: IconFileInvoice },
-    { path: '/receipts', label: 'Receipts', icon: IconReceipt },
+    { path: '/sales-orders', label: 'Sales Orders', icon: IconClipboardList, module: 'sales_order' },
+    { path: '/sales-invoices', label: 'Sales Invoices', icon: IconFileInvoice, module: 'sales_invoice' },
+    { path: '/receipts', label: 'Receipts', icon: IconReceipt, module: 'receipt' },
   ]},
   { group: 'Purchases', items: [
-    { path: '/purchase-orders', label: 'Purchase Orders', icon: IconClipboardCheck },
+    { path: '/purchase-orders', label: 'Purchase Orders', icon: IconClipboardCheck, module: 'purchase_order' },
   ]},
   { group: 'Inventory', items: [
-    { path: '/items', label: 'Items', icon: IconBox },
-    { path: '/inventory', label: 'Stock & MCs', icon: IconPackage },
-    { path: '/boms', label: 'Bill of Materials', icon: IconAssembly },
-    { path: '/productions', label: 'Productions', icon: IconTool },
+    { path: '/items', label: 'Items', icon: IconBox, module: 'item' },
+    { path: '/inventory', label: 'Stock & MCs', icon: IconPackage, module: 'inventory' },
+    { path: '/boms', label: 'Bill of Materials', icon: IconAssembly, module: 'bom' },
+    { path: '/productions', label: 'Productions', icon: IconTool, module: 'production' },
   ]},
   { group: 'Other', items: [
     { path: '/vouchers', label: 'All Vouchers', icon: IconFileInvoice },
-    { path: '/parties', label: 'Parties', icon: IconUsers },
-    { path: '/accounting', label: 'Accounting', icon: IconReportMoney },
+    { path: '/parties', label: 'Parties', icon: IconUsers, module: 'party' },
+    { path: '/accounting', label: 'Accounting', icon: IconReportMoney, module: 'accounting' },
+    { path: '/members', label: 'Members', icon: IconUsersGroup, module: 'member' },
     { path: '/settings', label: 'Settings', icon: IconSettings },
   ]},
-];
-
-// Flat list for sidebar
-const FLAT_NAV = [];
-for (const entry of NAV_ITEMS) {
-  if (entry.path) {
-    FLAT_NAV.push(entry);
-  } else if (entry.items) {
-    for (const item of entry.items) {
-      FLAT_NAV.push(item);
-    }
-  }
-}
-
-// Bottom tab bar tabs
-const BOTTOM_TABS = [
-  { path: '/', label: 'Home', icon: IconLayoutDashboard },
-  { path: '/sales-orders', label: 'Orders', icon: IconClipboardList },
-  { path: '__more__', label: 'More', icon: IconPlus },
-  { path: '/parties', label: 'Parties', icon: IconUsers },
-  { path: '/inventory', label: 'Inventory', icon: IconPackage },
-];
-
-// "More" drawer items (everything not in bottom tabs)
-const MORE_ITEMS = [
-  { path: '/', label: 'Dashboard', icon: IconLayoutDashboard },
-  { path: '/sales-orders', label: 'Sales Orders', icon: IconClipboardList },
-  { path: '/sales-invoices', label: 'Sales Invoices', icon: IconFileInvoice },
-  { path: '/receipts', label: 'Receipts', icon: IconReceipt },
-  { path: '/purchase-orders', label: 'Purchase Orders', icon: IconClipboardCheck },
-  { path: '/vouchers', label: 'All Vouchers', icon: IconFileInvoice },
-  { path: '/items', label: 'Items', icon: IconBox },
-  { path: '/inventory', label: 'Stock & MCs', icon: IconPackage },
-  { path: '/boms', label: 'Bill of Materials', icon: IconAssembly },
-  { path: '/productions', label: 'Productions', icon: IconTool },
-  { path: '/parties', label: 'Parties', icon: IconUsers },
-  { path: '/accounting', label: 'Accounting', icon: IconReportMoney },
-  { path: '/settings', label: 'Settings', icon: IconSettings },
 ];
 
 function isActive(itemPath, locationPath) {
@@ -108,6 +72,7 @@ export default function AppShell() {
   const [sidebarOpened, setSidebarOpened] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const { user, logout } = useAuth();
+  const { canAny } = usePermission();
   const location = useLocation();
   const navigate = useNavigate();
   const { colorScheme, toggleColorScheme } = useMantineColorScheme();
@@ -117,6 +82,48 @@ export default function AppShell() {
     location.pathname.includes('/edit') ||
     location.pathname.includes('/ledger') ||
     location.pathname.startsWith('/vouchers/')
+  );
+
+  // Filter nav items by permission
+  const NAV_ITEMS = useMemo(() => {
+    return ALL_NAV_ITEMS.map((entry) => {
+      if (entry.path) {
+        // Top-level item
+        if (entry.module && !canAny(entry.module)) return null;
+        return entry;
+      }
+      if (entry.items) {
+        const filtered = entry.items.filter(
+          (item) => !item.module || canAny(item.module)
+        );
+        if (filtered.length === 0) return null;
+        return { ...entry, items: filtered };
+      }
+      return entry;
+    }).filter(Boolean);
+  }, [canAny]);
+
+  // Flat list for "More" drawer
+  const MORE_ITEMS = useMemo(() => {
+    const flat = [];
+    for (const entry of NAV_ITEMS) {
+      if (entry.path) flat.push(entry);
+      else if (entry.items) flat.push(...entry.items);
+    }
+    return flat;
+  }, [NAV_ITEMS]);
+
+  // Bottom tabs — filtered by permission
+  const ALL_BOTTOM_TABS = [
+    { path: '/', label: 'Home', icon: IconLayoutDashboard, module: 'dashboard' },
+    { path: '/sales-orders', label: 'Orders', icon: IconClipboardList, module: 'sales_order' },
+    { path: '__more__', label: 'More', icon: IconPlus },
+    { path: '/parties', label: 'Parties', icon: IconUsers, module: 'party' },
+    { path: '/inventory', label: 'Inventory', icon: IconPackage, module: 'inventory' },
+  ];
+  const BOTTOM_TABS = useMemo(() =>
+    ALL_BOTTOM_TABS.filter((tab) => !tab.module || canAny(tab.module)),
+    [canAny]
   );
 
   function handleBottomTab(tab) {

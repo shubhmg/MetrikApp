@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Tabs,
   Select,
@@ -20,11 +21,12 @@ import {
 import { useMediaQuery } from '@mantine/hooks';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
-import { IconPencil, IconTrash, IconPlus, IconChartBar } from '@tabler/icons-react';
+import { IconPencil, IconTrash, IconPlus, IconChartBar, IconBook } from '@tabler/icons-react';
 import DataTable from '../components/DataTable.jsx';
 import ConfirmDelete from '../components/ConfirmDelete.jsx';
 import ItemSalesGraphModal from '../components/ItemSalesGraphModal.jsx';
 import api from '../services/api.js';
+import { usePermission } from '../hooks/usePermission.js';
 
 const GROUP_TYPES = [
   { value: 'raw_material', label: 'Raw Material' },
@@ -35,9 +37,14 @@ const GROUP_TYPES = [
 ];
 
 export default function Items() {
+  const navigate = useNavigate();
+  const { can } = usePermission();
+  const canWrite = can('item', 'write');
+  const canDelete = can('item', 'delete');
   const [items, setItems] = useState([]);
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [groupFilter, setGroupFilter] = useState('');
 
   // Modal state
   const [modalType, setModalType] = useState(null); // 'item' | 'group'
@@ -51,13 +58,19 @@ export default function Items() {
   const [graphsOpen, setGraphsOpen] = useState(false);
 
   const itemForm = useForm({
-    initialValues: { name: '', sku: '', itemGroupId: '', unit: 'pcs', hsnCode: '', gstRate: 18, costingMethod: 'weighted_average', reorderLevel: 0 },
+    initialValues: { name: '', sku: '', itemGroupId: '', unit: 'pcs', hsnCode: '', gstRate: 18, salesPrice: 0, reorderLevel: 0 },
   });
   const groupForm = useForm({
     initialValues: { name: '', code: '', type: 'raw_material' },
   });
 
   useEffect(() => { loadAll(); }, []);
+  useEffect(() => {
+    if (!groupFilter && groups.length > 0) {
+      const fg = groups.find((g) => g.type === 'finished_good');
+      if (fg) setGroupFilter(fg._id);
+    }
+  }, [groups, groupFilter]);
 
   async function loadAll() {
     setLoading(true);
@@ -75,7 +88,7 @@ export default function Items() {
   // --- Items ---
   function openItemCreate() {
     setEditingId(null);
-    itemForm.setValues({ name: '', sku: '', itemGroupId: groups[0]?._id || '', unit: 'pcs', hsnCode: '', gstRate: 18, costingMethod: 'weighted_average', reorderLevel: 0 });
+    itemForm.setValues({ name: '', sku: '', itemGroupId: groups[0]?._id || '', unit: 'pcs', hsnCode: '', gstRate: 18, salesPrice: 0, reorderLevel: 0 });
     setError('');
     setModalType('item');
   }
@@ -88,7 +101,7 @@ export default function Items() {
       unit: item.unit,
       hsnCode: item.hsnCode || '',
       gstRate: item.gstRate ?? 18,
-      costingMethod: item.costingMethod || 'weighted_average',
+      salesPrice: item.salesPrice || 0,
       reorderLevel: item.reorderLevel || 0,
     });
     setError('');
@@ -114,7 +127,8 @@ export default function Items() {
     setError('');
     try {
       if (editingId) {
-        await api.patch(`/items/${editingId}`, values);
+        const { sku, itemGroupId, ...updateData } = values;
+        await api.patch(`/items/${editingId}`, updateData);
         notifications.show({ title: 'Item updated', color: 'green' });
       } else {
         await api.post('/items', values);
@@ -175,12 +189,17 @@ export default function Items() {
       key: 'actions', label: '',
       render: (r) => (
         <Group gap={4}>
-          <ActionIcon variant="subtle" onClick={() => openItemEdit(r)}><IconPencil size={16} /></ActionIcon>
-          <ActionIcon variant="subtle" color="red" onClick={() => { setDeleteTarget(r); setDeleteType('item'); }}><IconTrash size={16} /></ActionIcon>
+          <ActionIcon variant="subtle" onClick={() => navigate(`/items/${r._id}/ledger`)}><IconBook size={16} /></ActionIcon>
+          {canWrite && <ActionIcon variant="subtle" onClick={() => openItemEdit(r)}><IconPencil size={16} /></ActionIcon>}
+          {canDelete && <ActionIcon variant="subtle" color="red" onClick={() => { setDeleteTarget(r); setDeleteType('item'); }}><IconTrash size={16} /></ActionIcon>}
         </Group>
       ),
     },
   ];
+
+  const filteredItems = groupFilter
+    ? items.filter((i) => (i.itemGroupId?._id || i.itemGroupId) === groupFilter)
+    : items;
 
   const groupColumns = [
     { key: 'code', label: 'Code', render: (r) => r.code, style: { fontFamily: 'monospace' } },
@@ -190,8 +209,8 @@ export default function Items() {
       key: 'actions', label: '',
       render: (r) => (
         <Group gap={4}>
-          <ActionIcon variant="subtle" onClick={() => openGroupEdit(r)}><IconPencil size={16} /></ActionIcon>
-          <ActionIcon variant="subtle" color="red" onClick={() => { setDeleteTarget(r); setDeleteType('group'); }}><IconTrash size={16} /></ActionIcon>
+          {canWrite && <ActionIcon variant="subtle" onClick={() => openGroupEdit(r)}><IconPencil size={16} /></ActionIcon>}
+          {canDelete && <ActionIcon variant="subtle" color="red" onClick={() => { setDeleteTarget(r); setDeleteType('group'); }}><IconTrash size={16} /></ActionIcon>}
         </Group>
       ),
     },
@@ -208,23 +227,66 @@ export default function Items() {
         </Tabs.List>
 
         <Tabs.Panel value="items">
-          <Group justify="flex-end" mb="sm">
-            <Group gap="xs" grow={isMobile}>
-              <Button leftSection={<IconPlus size={16} />} onClick={openItemCreate} fullWidth={isMobile}>Add Item</Button>
-              <ActionIcon
-                variant="light"
-                color="teal"
-                size="lg"
-                onClick={() => setGraphsOpen(true)}
-                aria-label="Sales graphs"
-              >
-                <IconChartBar size={18} />
-              </ActionIcon>
+          {isMobile ? (
+            <Stack gap="xs" mb="sm">
+              <Select
+                placeholder="All groups"
+                data={[
+                  { value: '', label: 'All groups' },
+                  ...groups.map((g) => ({ value: g._id, label: g.name })),
+                ]}
+                value={groupFilter}
+                onChange={(v) => setGroupFilter(v || '')}
+                w="100%"
+              />
+              <Group gap="xs" align="center">
+                {canWrite && <Button
+                  leftSection={<IconPlus size={16} />}
+                  onClick={openItemCreate}
+                  style={{ flex: 1 }}
+                >
+                  Add Item
+                </Button>}
+                <ActionIcon
+                  variant="light"
+                  color="teal"
+                  size="lg"
+                  onClick={() => setGraphsOpen(true)}
+                  aria-label="Sales graphs"
+                >
+                  <IconChartBar size={18} />
+                </ActionIcon>
+              </Group>
+            </Stack>
+          ) : (
+            <Group justify="space-between" mb="sm">
+              <Select
+                placeholder="All groups"
+                data={[
+                  { value: '', label: 'All groups' },
+                  ...groups.map((g) => ({ value: g._id, label: g.name })),
+                ]}
+                value={groupFilter}
+                onChange={(v) => setGroupFilter(v || '')}
+                w={220}
+              />
+              <Group gap="xs">
+                {canWrite && <Button leftSection={<IconPlus size={16} />} onClick={openItemCreate}>Add Item</Button>}
+                <ActionIcon
+                  variant="light"
+                  color="teal"
+                  size="lg"
+                  onClick={() => setGraphsOpen(true)}
+                  aria-label="Sales graphs"
+                >
+                  <IconChartBar size={18} />
+                </ActionIcon>
+              </Group>
             </Group>
-          </Group>
+          )}
           <DataTable
             columns={itemColumns}
-            data={items}
+            data={filteredItems}
             emptyMessage="No items yet"
             mobileRender={(r) => (
               <Card key={r._id} withBorder padding="sm">
@@ -239,8 +301,9 @@ export default function Items() {
                     </Group>
                   </div>
                   <Group gap={4}>
-                    <ActionIcon variant="subtle" onClick={() => openItemEdit(r)}><IconPencil size={16} /></ActionIcon>
-                    <ActionIcon variant="subtle" color="red" onClick={() => { setDeleteTarget(r); setDeleteType('item'); }}><IconTrash size={16} /></ActionIcon>
+                    <ActionIcon variant="subtle" onClick={() => navigate(`/items/${r._id}/ledger`)}><IconBook size={16} /></ActionIcon>
+                    {canWrite && <ActionIcon variant="subtle" onClick={() => openItemEdit(r)}><IconPencil size={16} /></ActionIcon>}
+                    {canDelete && <ActionIcon variant="subtle" color="red" onClick={() => { setDeleteTarget(r); setDeleteType('item'); }}><IconTrash size={16} /></ActionIcon>}
                   </Group>
                 </Group>
               </Card>
@@ -250,7 +313,7 @@ export default function Items() {
 
         <Tabs.Panel value="groups">
           <Group justify="flex-end" mb="sm">
-            <Button leftSection={<IconPlus size={16} />} onClick={openGroupCreate} fullWidth={isMobile}>Add Group</Button>
+            {canWrite && <Button leftSection={<IconPlus size={16} />} onClick={openGroupCreate} fullWidth={isMobile}>Add Group</Button>}
           </Group>
           <DataTable
             columns={groupColumns}
@@ -265,8 +328,8 @@ export default function Items() {
                     <Badge variant="light" size="sm" mt={4}>{r.type.replace(/_/g, ' ')}</Badge>
                   </div>
                   <Group gap={4}>
-                    <ActionIcon variant="subtle" onClick={() => openGroupEdit(r)}><IconPencil size={16} /></ActionIcon>
-                    <ActionIcon variant="subtle" color="red" onClick={() => { setDeleteTarget(r); setDeleteType('group'); }}><IconTrash size={16} /></ActionIcon>
+                    {canWrite && <ActionIcon variant="subtle" onClick={() => openGroupEdit(r)}><IconPencil size={16} /></ActionIcon>}
+                    {canDelete && <ActionIcon variant="subtle" color="red" onClick={() => { setDeleteTarget(r); setDeleteType('group'); }}><IconTrash size={16} /></ActionIcon>}
                   </Group>
                 </Group>
               </Card>
@@ -276,7 +339,7 @@ export default function Items() {
       </Tabs>
 
       {/* Item Modal */}
-      <Modal opened={modalType === 'item'} onClose={() => setModalType(null)} title={editingId ? 'Edit Item' : 'New Item'} centered>
+      <Modal opened={modalType === 'item'} onClose={() => setModalType(null)} title={editingId ? 'Edit Item' : 'New Item'} centered fullScreen={isMobile}>
         {error && <Alert color="red" variant="light" mb="sm">{error}</Alert>}
         <form onSubmit={itemForm.onSubmit(handleItemSubmit)}>
           <Stack>
@@ -292,11 +355,7 @@ export default function Items() {
             <TextInput label="Unit" required {...itemForm.getInputProps('unit')} />
             <TextInput label="HSN Code" {...itemForm.getInputProps('hsnCode')} />
             <NumberInput label="GST Rate (%)" min={0} max={100} {...itemForm.getInputProps('gstRate')} />
-            <Select
-              label="Costing Method"
-              data={[{ value: 'weighted_average', label: 'Weighted Average' }, { value: 'fifo', label: 'FIFO' }]}
-              {...itemForm.getInputProps('costingMethod')}
-            />
+            <NumberInput label="Sales Price" min={0} decimalScale={2} {...itemForm.getInputProps('salesPrice')} />
             <NumberInput label="Reorder Level" min={0} {...itemForm.getInputProps('reorderLevel')} />
             <Group justify="flex-end">
               <Button variant="default" onClick={() => setModalType(null)}>Cancel</Button>
@@ -307,7 +366,7 @@ export default function Items() {
       </Modal>
 
       {/* Group Modal */}
-      <Modal opened={modalType === 'group'} onClose={() => setModalType(null)} title={editingId ? 'Edit Group' : 'New Item Group'} centered>
+      <Modal opened={modalType === 'group'} onClose={() => setModalType(null)} title={editingId ? 'Edit Group' : 'New Item Group'} centered fullScreen={isMobile}>
         {error && <Alert color="red" variant="light" mb="sm">{error}</Alert>}
         <form onSubmit={groupForm.onSubmit(handleGroupSubmit)}>
           <Stack>

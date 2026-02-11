@@ -1,31 +1,39 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Modal, Group, Select, Stack, Text, Card, Loader } from '@mantine/core';
+import { Modal, Group, Select, Stack, Text, Card, Loader, SegmentedControl, Badge } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import api from '../services/api.js';
 
-function getFiscalYearRange(date = new Date()) {
-  const year = date.getFullYear();
-  const month = date.getMonth();
-  const startYear = month >= 3 ? year : year - 1; // FY starts April
+function getFiscalYearRange(startYear) {
   const start = new Date(startYear, 3, 1);
   const end = new Date(startYear + 1, 2, 31, 23, 59, 59, 999);
   return { start, end, startYear };
 }
 
+function getFyStartYear(date) {
+  const y = date.getFullYear();
+  return date.getMonth() >= 3 ? y : y - 1;
+}
+
 function getFyMonthIndex(d, startYear) {
   const month = d.getMonth();
   const year = d.getFullYear();
-  // FY starts in April (month 3)
-  const idx = (year - startYear) * 12 + (month - 3);
-  return idx;
+  return (year - startYear) * 12 + (month - 3);
 }
 
 const MONTH_LABELS = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
+const QUARTER_LABELS = ['Q1', 'Q2', 'Q3', 'Q4'];
+
+const FY_COLORS = ['#22c55e', '#3b82f6', '#f59e0b'];
 
 export default function ItemSalesGraphModal({ opened, onClose, items }) {
   const [loading, setLoading] = useState(false);
   const [mcFilter, setMcFilter] = useState(null);
+  const [itemFilter, setItemFilter] = useState('');
   const [mcs, setMcs] = useState([]);
   const [dataMap, setDataMap] = useState({});
+  const [granularity, setGranularity] = useState('monthly');
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const isMobile = useMediaQuery('(max-width: 48em)');
 
   const finishedGoods = useMemo(() => {
     return items.filter((i) => {
@@ -36,7 +44,7 @@ export default function ItemSalesGraphModal({ opened, onClose, items }) {
 
   useEffect(() => {
     if (!opened) return;
-    api.get('/material-centres')
+    api.get('/material-centres/lookup')
       .then(({ data }) => setMcs(data.data.materialCentres))
       .catch(() => {});
   }, [opened]);
@@ -48,7 +56,11 @@ export default function ItemSalesGraphModal({ opened, onClose, items }) {
 
   async function loadSales() {
     if (finishedGoods.length === 0) return;
-    const { start, end, startYear } = getFiscalYearRange();
+    const currentStartYear = getFyStartYear(new Date());
+    const fyStarts = [currentStartYear - 2, currentStartYear - 1, currentStartYear];
+    const { start } = getFiscalYearRange(fyStarts[0]);
+    const { end } = getFiscalYearRange(fyStarts[2]);
+
     const paramsBase = {
       voucherType: 'sales_invoice',
       fromDate: start.toISOString(),
@@ -73,17 +85,23 @@ export default function ItemSalesGraphModal({ opened, onClose, items }) {
 
       const map = {};
       for (const item of finishedGoods) {
-        map[item._id] = new Array(12).fill(0);
+        map[item._id] = {
+          [fyStarts[0]]: new Array(12).fill(0),
+          [fyStarts[1]]: new Array(12).fill(0),
+          [fyStarts[2]]: new Array(12).fill(0),
+        };
       }
 
       all.forEach((v) => {
         const d = new Date(v.date);
-        const mi = getFyMonthIndex(d, startYear);
+        const fyStartYear = getFyStartYear(d);
+        if (!fyStarts.includes(fyStartYear)) return;
+        const mi = getFyMonthIndex(d, fyStartYear);
         if (mi < 0 || mi > 11) return;
         (v.lineItems || []).forEach((li) => {
           const id = li.itemId?._id || li.itemId;
           if (!id || !map[id]) return;
-          map[id][mi] += Number(li.quantity || 0);
+          map[id][fyStartYear][mi] += Number(li.quantity || 0);
         });
       });
 
@@ -95,61 +113,223 @@ export default function ItemSalesGraphModal({ opened, onClose, items }) {
   }
 
   const mcOptions = [{ value: '', label: 'All MCs' }, ...mcs.map((m) => ({ value: m._id, label: m.name }))];
+  const itemOptions = [{ value: '', label: 'All Finished Goods' }, ...finishedGoods.map((i) => ({ value: i._id, label: i.name }))];
+  const currentStartYear = getFyStartYear(new Date());
+  const fyStarts = [currentStartYear - 2, currentStartYear - 1, currentStartYear];
+  const labels = granularity === 'monthly' ? MONTH_LABELS : QUARTER_LABELS;
 
   return (
-    <Modal opened={opened} onClose={onClose} title="Finished Goods Sales" size="xl" centered>
+    <Modal
+      opened={opened}
+      onClose={onClose}
+      title="Finished Goods Sales"
+      size="xl"
+      centered
+      fullScreen={isMobile}
+      padding={isMobile ? 'sm' : 'md'}
+    >
       <Stack gap="sm">
-        <Group justify="space-between" align="center">
+        <Group justify="space-between" align="center" wrap={isMobile}>
+          <Select
+            placeholder="All Finished Goods"
+            data={itemOptions}
+            value={itemFilter}
+            onChange={(v) => setItemFilter(v || '')}
+            w={isMobile ? '100%' : 240}
+            searchable
+            clearable
+            comboboxProps={{
+              withinPortal: true,
+              position: 'bottom-start',
+              onDropdownOpen: () => setFiltersOpen(true),
+              onDropdownClose: () => setFiltersOpen(false),
+            }}
+          />
           <Select
             placeholder="All MCs"
             data={mcOptions}
             value={mcFilter || ''}
             onChange={(v) => setMcFilter(v || null)}
-            w={200}
+            w={isMobile ? '100%' : 200}
+            comboboxProps={{
+              withinPortal: true,
+              position: 'bottom-start',
+              onDropdownOpen: () => setFiltersOpen(true),
+              onDropdownClose: () => setFiltersOpen(false),
+            }}
           />
-          <Text size="xs" c="dimmed">
-            FY {getFiscalYearRange().startYear}-{String(getFiscalYearRange().startYear + 1).slice(2)}
-          </Text>
+          <SegmentedControl
+            size="xs"
+            value={granularity}
+            onChange={setGranularity}
+            data={[
+              { value: 'monthly', label: 'Monthly' },
+              { value: 'quarterly', label: 'Quarterly' },
+            ]}
+            w={isMobile ? '100%' : 'auto'}
+          />
         </Group>
 
-        <Group gap="xs" wrap="nowrap">
-          {MONTH_LABELS.map((m) => (
-            <Text key={m} size="xs" c="dimmed" style={{ width: 24, textAlign: 'center' }}>{m}</Text>
+        <Group gap="md" align="center">
+          {fyStarts.map((fy, i) => (
+            <Group key={fy} gap={6} align="center">
+              <div style={{ width: 10, height: 10, borderRadius: 999, background: FY_COLORS[i] }} />
+              <Text size="xs" c="dimmed">FY {fy}-{String(fy + 1).slice(2)}</Text>
+            </Group>
           ))}
+          <Badge size="xs" variant="light">3 FYs</Badge>
         </Group>
+
+        {!isMobile && (
+          <Group gap="xs" wrap="nowrap">
+            {labels.map((m) => (
+              <Text key={m} size="xs" c="dimmed" style={{ width: 36, textAlign: 'center' }}>{m}</Text>
+            ))}
+          </Group>
+        )}
 
         {loading && <Loader size="sm" />}
-        {!loading && finishedGoods.map((item) => {
-          const series = dataMap[item._id] || new Array(12).fill(0);
-          const max = Math.max(...series, 1);
+        {!loading && filtersOpen && (
+          <Text size="xs" c="dimmed">Close the dropdown to view charts.</Text>
+        )}
+        {!loading && !filtersOpen && finishedGoods
+          .filter((i) => !itemFilter || i._id === itemFilter)
+          .map((item) => {
+          const seriesMap = dataMap[item._id] || {};
+          const byFy = fyStarts.map((fy) => seriesMap[fy] || new Array(12).fill(0));
+          const agg = (arr) => {
+            if (granularity === 'monthly') return arr;
+            return [0, 1, 2, 3].map((q) => arr.slice(q * 3, q * 3 + 3).reduce((s, v) => s + v, 0));
+          };
+          const series = byFy.map((arr) => agg(arr));
+          const max = Math.max(...series.flat(), 1);
+          const yTicks = [max, Math.round(max * 0.66), Math.round(max * 0.33), 0];
+
           return (
-            <Card key={item._id} withBorder padding="sm">
+            <Card key={item._id} withBorder padding={isMobile ? 8 : 'sm'}>
               <Stack gap={6}>
                 <Text fw={600} lineClamp={1}>{item.name}</Text>
-                <Group gap={6} wrap="nowrap">
-                  {series.map((v, i) => (
-                    <div
-                      key={`${item._id}-${i}`}
-                      style={{
-                        width: 24,
-                        height: 48,
-                        display: 'flex',
-                        alignItems: 'flex-end',
-                        justifyContent: 'center',
-                      }}
-                    >
+                <Group gap={isMobile ? 6 : 10} wrap="nowrap" align="flex-start">
+                  {!isMobile && (
+                    <Stack gap={10} style={{ width: 32 }}>
+                      {yTicks.map((t, i) => (
+                        <Text key={`${item._id}-yt-${i}`} size="xs" c="dimmed" style={{ lineHeight: 1, textAlign: 'right' }}>
+                          {t}
+                        </Text>
+                      ))}
+                    </Stack>
+                  )}
+                  <div
+                    style={{
+                      flex: 1,
+                      position: 'relative',
+                      height: isMobile ? 86 : 96,
+                      background: 'var(--app-surface-elevated)',
+                      borderRadius: 8,
+                      padding: isMobile ? '8px 6px' : '10px 8px',
+                      overflowX: isMobile && granularity === 'quarterly' ? 'auto' : 'hidden',
+                    }}
+                  >
+                    {yTicks.map((_, i) => (
                       <div
+                        key={`${item._id}-grid-${i}`}
                         style={{
-                          width: 12,
-                          height: Math.round((v / max) * 40),
-                          borderRadius: 6,
-                          background: 'var(--mantine-color-teal-6)',
-                          opacity: v === 0 ? 0.25 : 1,
+                          position: 'absolute',
+                          left: isMobile ? 6 : 8,
+                          right: isMobile ? 6 : 8,
+                          top: (isMobile ? 10 : 10) + (i * (isMobile ? 18 : 20)),
+                          borderTop: '1px dashed var(--mantine-color-default-border)'
                         }}
                       />
+                    ))}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        left: isMobile ? 6 : 8,
+                        right: isMobile ? 6 : 8,
+                        bottom: isMobile ? 8 : 10,
+                        overflowX: isMobile && granularity === 'quarterly' ? 'auto' : 'hidden',
+                      }}
+                    >
+                      <Group
+                        gap={granularity === 'quarterly' ? (isMobile ? 8 : 12) : (isMobile ? 6 : 8)}
+                        wrap="nowrap"
+                        align="end"
+                        style={{
+                          minWidth: isMobile
+                            ? labels.length * (granularity === 'quarterly' ? 72 : 0)
+                            : 'auto',
+                        }}
+                      >
+                        {labels.map((label, idx) => (
+                          <div
+                            key={`${item._id}-${idx}`}
+                            style={{
+                              width: granularity === 'quarterly'
+                                ? (isMobile ? 72 : 84)
+                                : (isMobile ? 28 : 36),
+                              height: isMobile ? 54 : 64,
+                              display: 'flex',
+                              alignItems: 'flex-end',
+                              justifyContent: 'center',
+                              gap: 0,
+                              position: 'relative',
+                            }}
+                          >
+                            {series.map((s, si) => {
+                              const h = Math.round((s[idx] / max) * (isMobile ? 48 : 56));
+                              const barWidth = granularity === 'quarterly'
+                                ? (isMobile ? 12 : 14)
+                                : (isMobile ? 6 : 8);
+                              return (
+                                <div key={`${item._id}-${idx}-${si}`} style={{ position: 'relative' }}>
+                                  {!isMobile && s[idx] > 0 && (
+                                    <Text size="xs" c="dimmed" style={{ position: 'absolute', top: -14, left: -2 }}>
+                                      {Math.round(s[idx])}
+                                    </Text>
+                                  )}
+                                  <div
+                                    style={{
+                                      width: barWidth,
+                                      height: h,
+                                      borderRadius: 0,
+                                      background: FY_COLORS[si],
+                                      opacity: s[idx] === 0 ? 0.2 : 1,
+                                    }}
+                                  />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ))}
+                      </Group>
                     </div>
-                  ))}
+                  </div>
                 </Group>
+                {isMobile && (
+                  <Group
+                    gap={8}
+                    wrap="nowrap"
+                    style={{
+                      overflowX: granularity === 'quarterly' ? 'auto' : 'hidden',
+                      paddingBottom: 4,
+                    }}
+                  >
+                    {labels.map((m) => (
+                      <Text
+                        key={m}
+                        size="xs"
+                        c="dimmed"
+                        style={{
+                          width: granularity === 'quarterly' ? 72 : 28,
+                          textAlign: 'center',
+                        }}
+                      >
+                        {m}
+                      </Text>
+                    ))}
+                  </Group>
+                )}
               </Stack>
             </Card>
           );

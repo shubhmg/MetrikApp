@@ -7,6 +7,7 @@ import { IconTrash, IconEdit } from '@tabler/icons-react';
 import PageHeader from '../components/PageHeader.jsx';
 import VoucherDetailModal from '../components/VoucherDetailModal.jsx';
 import api from '../services/api.js';
+import { usePermission } from '../hooks/usePermission.js';
 
 function fmtDate(d) {
   return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -16,7 +17,7 @@ function fmtCurrency(n) {
   return (n || 0).toLocaleString('en-IN', { style: 'currency', currency: 'INR' });
 }
 
-function OrderCard({ voucher, onView, onDelete, onEdit }) {
+function OrderCard({ voucher, onView, onDelete, onEdit, canWrite, canDelete }) {
   const items = voucher.lineItems || [];
 
   return (
@@ -56,22 +57,22 @@ function OrderCard({ voucher, onView, onDelete, onEdit }) {
         <Stack align="flex-end" gap={4}>
           <Text size="sm" fw={700}>{fmtCurrency(voucher.grandTotal)}</Text>
           <Group gap={4}>
-            <ActionIcon
+            {canWrite && <ActionIcon
               variant="subtle"
               color="teal"
               size="sm"
               onClick={(e) => { e.stopPropagation(); onEdit(voucher); }}
             >
               <IconEdit size={14} />
-            </ActionIcon>
-            <ActionIcon
+            </ActionIcon>}
+            {canDelete && <ActionIcon
               variant="subtle"
               color="red"
               size="sm"
               onClick={(e) => { e.stopPropagation(); onDelete(voucher); }}
             >
               <IconTrash size={14} />
-            </ActionIcon>
+            </ActionIcon>}
           </Group>
         </Stack>
       </Group>
@@ -79,7 +80,7 @@ function OrderCard({ voucher, onView, onDelete, onEdit }) {
   );
 }
 
-function OrderGroup({ date, vouchers, onView, onDelete, onEdit }) {
+function OrderGroup({ date, vouchers, onView, onDelete, onEdit, canWrite, canDelete }) {
   return (
     <Box mb="md">
       <Text c="dimmed" size="xs" fw={700} mb="xs" tt="uppercase" style={{ letterSpacing: 0.5 }}>
@@ -89,7 +90,7 @@ function OrderGroup({ date, vouchers, onView, onDelete, onEdit }) {
         <Stack gap="sm" style={{ background: 'var(--app-bg)' }}>
           {vouchers.map((v, i) => (
             <Box key={v._id}>
-              <OrderCard voucher={v} onView={onView} onDelete={onDelete} onEdit={onEdit} />
+              <OrderCard voucher={v} onView={onView} onDelete={onDelete} onEdit={onEdit} canWrite={canWrite} canDelete={canDelete} />
             </Box>
           ))}
         </Stack>
@@ -100,6 +101,9 @@ function OrderGroup({ date, vouchers, onView, onDelete, onEdit }) {
 
 export default function PurchaseOrders() {
   const navigate = useNavigate();
+  const { can } = usePermission();
+  const canWritePO = can('purchase_order', 'write');
+  const canDeletePO = can('purchase_order', 'delete');
   const [vouchers, setVouchers] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -111,7 +115,7 @@ export default function PurchaseOrders() {
   const isMobile = useMediaQuery('(max-width: 48em)');
 
   useEffect(() => {
-    api.get('/material-centres').then(({ data }) => setMcs(data.data.materialCentres)).catch(() => {});
+    api.get('/material-centres/lookup').then(({ data }) => setMcs(data.data.materialCentres)).catch(() => {});
   }, []);
 
   useEffect(() => { loadVouchers(); }, [page, mcFilter]);
@@ -168,7 +172,7 @@ export default function PurchaseOrders() {
       <PageHeader
         title="Purchase Orders"
         count={total}
-        actionLabel="New Order"
+        actionLabel={canWritePO ? "New Order" : null}
         onAction={() => navigate('/vouchers/new?type=purchase_order')}
       >
         <Select
@@ -190,7 +194,7 @@ export default function PurchaseOrders() {
       ) : (
         <>
           {Object.entries(grouped).map(([date, list]) => (
-            <OrderGroup key={date} date={date} vouchers={list} onView={viewDetail} onDelete={handleDelete} onEdit={handleEdit} />
+            <OrderGroup key={date} date={date} vouchers={list} onView={viewDetail} onDelete={handleDelete} onEdit={handleEdit} canWrite={canWritePO} canDelete={canDeletePO} />
           ))}
           {totalPages > 1 && (
             <Center mt="md">

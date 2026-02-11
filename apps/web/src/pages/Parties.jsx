@@ -23,6 +23,7 @@ import PageHeader from '../components/PageHeader.jsx';
 import DataTable from '../components/DataTable.jsx';
 import ConfirmDelete from '../components/ConfirmDelete.jsx';
 import api from '../services/api.js';
+import { usePermission } from '../hooks/usePermission.js';
 
 const TYPE_OPTIONS = [
   { value: 'customer', label: 'Customer' },
@@ -33,9 +34,12 @@ const TYPE_OPTIONS = [
 const EMPTY_FORM = { name: '', type: ['customer'], gstin: '', phone: '', email: '', creditDays: 0 };
 
 export default function Parties() {
-  const [parties, setParties] = useState([]);
+  const { can } = usePermission();
+  const canWrite = can('party', 'write');
+  const canDelete = can('party', 'delete');
+  const [parties, setParties] = useState([])
   const [loading, setLoading] = useState(true);
-  const [typeFilter, setTypeFilter] = useState(null);
+  const [typeFilter, setTypeFilter] = useState('customer');
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -153,8 +157,8 @@ export default function Parties() {
       key: 'actions', label: '',
       render: (r) => (
         <Group gap={4} onClick={(e) => e.stopPropagation()}>
-          <ActionIcon variant="subtle" onClick={() => openEdit(r)}><IconPencil size={16} /></ActionIcon>
-          <ActionIcon variant="subtle" color="red" onClick={() => setDeleteTarget(r)}><IconTrash size={16} /></ActionIcon>
+          {canWrite && <ActionIcon variant="subtle" onClick={() => openEdit(r)}><IconPencil size={16} /></ActionIcon>}
+          {canDelete && <ActionIcon variant="subtle" color="red" onClick={() => setDeleteTarget(r)}><IconTrash size={16} /></ActionIcon>}
         </Group>
       ),
     },
@@ -162,7 +166,7 @@ export default function Parties() {
 
   return (
     <div>
-      <PageHeader title="Parties" count={filtered.length} actionLabel="Add Party" onAction={openCreate}>
+      <PageHeader title="Parties" count={filtered.length} actionLabel={canWrite ? "Add Party" : null} onAction={openCreate}>
         <Select
           placeholder="All Types"
           data={TYPE_OPTIONS}
@@ -203,8 +207,8 @@ export default function Parties() {
                 {r.gstin && <Text size="xs" c="dimmed" ff="monospace" mt={2}>{r.gstin}</Text>}
               </div>
               <Group gap={4}>
-                <ActionIcon variant="subtle" onClick={(e) => { e.stopPropagation(); openEdit(r); }}><IconPencil size={16} /></ActionIcon>
-                <ActionIcon variant="subtle" color="red" onClick={(e) => { e.stopPropagation(); setDeleteTarget(r); }}><IconTrash size={16} /></ActionIcon>
+                {canWrite && <ActionIcon variant="subtle" onClick={(e) => { e.stopPropagation(); openEdit(r); }}><IconPencil size={16} /></ActionIcon>}
+                {canDelete && <ActionIcon variant="subtle" color="red" onClick={(e) => { e.stopPropagation(); setDeleteTarget(r); }}><IconTrash size={16} /></ActionIcon>}
               </Group>
             </Group>
           </Card>
