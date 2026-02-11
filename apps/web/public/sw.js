@@ -4,62 +4,62 @@ const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 const APP_SHELL = ['/', '/index.html', '/manifest.json', '/favicon.svg'];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(STATIC_CACHE).then((cache) => cache.addAll(APP_SHELL))
-  );
-  self.skipWaiting();
+    event.waitUntil(
+        caches.open(STATIC_CACHE).then((cache) => cache.addAll(APP_SHELL))
+    );
+    // Remove self.skipWaiting() - let the browser control the activation
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter((key) => ![STATIC_CACHE, RUNTIME_CACHE].includes(key))
-          .map((key) => caches.delete(key))
-      )
-    )
-  );
-  self.clients.claim();
+    event.waitUntil(
+        caches.keys().then((keys) =>
+            Promise.all(
+                keys
+                    .filter((key) => key !== STATIC_CACHE && key !== RUNTIME_CACHE)
+                    .map((key) => caches.delete(key))
+            )
+        )
+    );
+    // Remove self.clients.claim() - don't take control immediately
 });
 
 self.addEventListener('fetch', (event) => {
-  const { request } = event;
-  const url = new URL(request.url);
+    const { request } = event;
+    const url = new URL(request.url);
 
-  if (request.method !== 'GET') return;
-  if (url.pathname.startsWith('/api/')) return;
-  if (url.origin !== self.location.origin) return;
+    if (request.method !== 'GET') return;
+    if (url.pathname.startsWith('/api/')) return;
+    if (url.origin !== self.location.origin) return;
 
-  if (request.mode === 'navigate') {
+    if (request.mode === 'navigate') {
+        event.respondWith(
+            fetch(request)
+                .then((response) => {
+                    const copy = response.clone();
+                    caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, copy));
+                    return response;
+                })
+                .catch(async () => {
+                    const cached = await caches.match(request);
+                    if (cached) return cached;
+                    return caches.match('/index.html');
+                })
+        );
+        return;
+    }
+
     event.respondWith(
-      fetch(request)
-        .then((response) => {
-          const copy = response.clone();
-          caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, copy));
-          return response;
-        })
-        .catch(async () => {
-          const cached = await caches.match(request);
-          if (cached) return cached;
-          return caches.match('/index.html');
+        caches.match(request).then((cached) => {
+            if (cached) return cached;
+
+            return fetch(request).then((response) => {
+                if (!response || response.status !== 200 || response.type !== 'basic') {
+                    return response;
+                }
+                const copy = response.clone();
+                caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, copy));
+                return response;
+            });
         })
     );
-    return;
-  }
-
-  event.respondWith(
-    caches.match(request).then((cached) => {
-      if (cached) return cached;
-
-      return fetch(request).then((response) => {
-        if (!response || response.status !== 200 || response.type !== 'basic') {
-          return response;
-        }
-        const copy = response.clone();
-        caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, copy));
-        return response;
-      });
-    })
-  );
 });
