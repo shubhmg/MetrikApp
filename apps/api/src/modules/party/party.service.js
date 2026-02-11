@@ -22,7 +22,8 @@ function getLinkedAccountGroup(partyTypes) {
 }
 
 export async function createParty(data, businessId, userId) {
-  if (data.contractorSettings && !data.type?.includes(PARTY_TYPES.CONTRACTOR)) {
+  // Check if contractor settings are being enabled for a non-contractor party
+  if (data.contractorSettings?.isEnabled && !data.type?.includes(PARTY_TYPES.CONTRACTOR)) {
     throw ApiError.badRequest('Contractor settings can be set only for contractor party type');
   }
   if (data.contractorSettings?.linkedUserId) {
@@ -112,7 +113,8 @@ export async function updateParty(id, data, businessId, userId) {
   const party = await Party.findOne({ _id: id, businessId });
   if (!party) throw ApiError.notFound('Party not found');
 
-  if (data.contractorSettings && !(data.type || party.type || []).includes(PARTY_TYPES.CONTRACTOR)) {
+  // Check if contractor settings are being enabled for a non-contractor party
+  if (data.contractorSettings?.isEnabled && !(data.type || party.type || []).includes(PARTY_TYPES.CONTRACTOR)) {
     throw ApiError.badRequest('Contractor settings can be set only for contractor party type');
   }
   if (data.contractorSettings?.linkedUserId) {

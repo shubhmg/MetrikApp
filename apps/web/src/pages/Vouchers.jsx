@@ -36,6 +36,7 @@ export default function Vouchers() {
   const [typeFilter, setTypeFilter] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
+  const [selectOpen, setSelectOpen] = useState(false);
   const isMobile = useMediaQuery('(max-width: 48em)');
 
   useEffect(() => { loadVouchers(); }, [page, typeFilter]);
@@ -74,12 +75,18 @@ export default function Vouchers() {
           clearable
           searchable
           w={isMobile ? '100%' : 200}
+          comboboxProps={{
+            withinPortal: true,
+            position: 'bottom-start',
+            onDropdownOpen: () => setSelectOpen(true),
+            onDropdownClose: () => setSelectOpen(false),
+          }}
         />
       </PageHeader>
 
       {loading ? (
         <Center py="xl"><Loader /></Center>
-      ) : (
+      ) : !selectOpen && (
         <>
           <VoucherList vouchers={vouchers} onItemClick={viewDetail} />
           {totalPages > 1 && (

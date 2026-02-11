@@ -68,6 +68,7 @@ export default function Parties() {
   const [mcs, setMcs] = useState([]);
   const [members, setMembers] = useState([]);
   const [contractorRates, setContractorRates] = useState([]);
+  const [selectOpen, setSelectOpen] = useState(false);
   const navigate = useNavigate();
   const isMobile = useMediaQuery('(max-width: 48em)');
 
@@ -274,16 +275,23 @@ export default function Parties() {
           onChange={setTypeFilter}
           clearable
           w={isMobile ? '100%' : 160}
+          comboboxProps={{
+            withinPortal: true,
+            position: 'bottom-start',
+            onDropdownOpen: () => setSelectOpen(true),
+            onDropdownClose: () => setSelectOpen(false),
+          }}
         />
         <TextInput placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} w={isMobile ? '100%' : 200} />
       </PageHeader>
 
-      <DataTable
-        columns={columns}
-        data={filtered}
-        loading={loading}
-        emptyMessage="No parties yet"
-        mobileRender={(r) => (
+      {!selectOpen && (
+        <DataTable
+          columns={columns}
+          data={filtered}
+          loading={loading}
+          emptyMessage="No parties yet"
+          mobileRender={(r) => (
           <Card key={r._id} withBorder padding="sm">
             <Group justify="space-between" wrap="nowrap">
               <div style={{ minWidth: 0, flex: 1 }}>
@@ -314,12 +322,14 @@ export default function Parties() {
           </Card>
         )}
       />
+      )}
 
       <Modal
         opened={modalOpen}
         onClose={() => setModalOpen(false)}
         title={editingId ? 'Edit Party' : 'New Party'}
         centered
+        fullScreen={isMobile}
       >
         {error && <Alert color="red" variant="light" mb="sm">{error}</Alert>}
         <form onSubmit={form.onSubmit(handleSubmit)}>

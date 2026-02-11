@@ -83,6 +83,7 @@ export default function PartyLedger() {
   const [ledger, setLedger] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectOpen, setSelectOpen] = useState(false);
   const isMobile = useMediaQuery('(max-width: 48em)');
   const backPath = role === 'contractor' ? '/productions' : '/parties';
 
@@ -167,6 +168,12 @@ export default function PartyLedger() {
           onChange={setFy}
           allowDeselect={false}
           w={isMobile ? '100%' : 180}
+          comboboxProps={{
+            withinPortal: true,
+            position: 'bottom-start',
+            onDropdownOpen: () => setSelectOpen(true),
+            onDropdownClose: () => setSelectOpen(false),
+          }}
         />
         {ledger && (
           <SimpleGrid cols={{ base: 1, xs: 3 }}>
@@ -192,7 +199,7 @@ export default function PartyLedger() {
       {error && !loading && <Alert color="red" mb="md">{error}</Alert>}
 
       {/* Desktop table */}
-      {!loading && ledger && (
+      {!loading && ledger && !selectOpen && (
         <Box visibleFrom="sm">
           <Table striped highlightOnHover withTableBorder withColumnBorders verticalSpacing="sm">
             <Table.Thead>
@@ -265,7 +272,7 @@ export default function PartyLedger() {
       )}
 
       {/* Mobile simple table */}
-      {!loading && ledger && (
+      {!loading && ledger && !selectOpen && (
         <Box hiddenFrom="sm">
           <Card withBorder padding={0} radius="md">
             <Table striped withTableBorder verticalSpacing="xs">

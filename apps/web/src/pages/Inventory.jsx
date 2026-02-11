@@ -49,6 +49,7 @@ export default function Inventory() {
   const [stockMcFilter, setStockMcFilter] = useState(null);
   const [stockGroupFilter, setStockGroupFilter] = useState(null);
   const [stockLoading, setStockLoading] = useState(false);
+  const [stockSelectOpen, setStockSelectOpen] = useState(false);
 
   // Modal state
   const [modalType, setModalType] = useState(null); // 'mc'
@@ -197,6 +198,12 @@ export default function Inventory() {
                 onChange={setStockMcFilter}
                 clearable
                 size="sm"
+                comboboxProps={{
+                  withinPortal: true,
+                  position: 'bottom-start',
+                  onDropdownOpen: () => setStockSelectOpen(true),
+                  onDropdownClose: () => setStockSelectOpen(false),
+                }}
               />
               <Select
                 placeholder="Filter by Group"
@@ -205,6 +212,12 @@ export default function Inventory() {
                 onChange={setStockGroupFilter}
                 clearable
                 size="sm"
+                comboboxProps={{
+                  withinPortal: true,
+                  position: 'bottom-start',
+                  onDropdownOpen: () => setStockSelectOpen(true),
+                  onDropdownClose: () => setStockSelectOpen(false),
+                }}
               />
             </Group>
             <Group grow={isMobile}>
@@ -212,27 +225,29 @@ export default function Inventory() {
               {canWritePhysical && <Button size="sm" variant="light" onClick={() => setPhysicalStockOpen(true)}>Physical Stock</Button>}
             </Group>
           </Stack>
-          <DataTable
-            columns={stockColumns}
-            data={stockData}
-            loading={stockLoading}
-            emptyMessage="No stock data found"
-            mobileRender={(r) => (
-              <Card key={r._id} withBorder padding="sm">
-                <Group justify="space-between" wrap="nowrap">
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <Text fw={600} truncate>{r.itemId?.name || 'Unknown'}</Text>
-                    <Text size="xs" c="dimmed" ff="monospace">{r.itemId?.sku || '-'}</Text>
-                    <Group gap={6} mt={4}>
-                      {r.itemId?.itemGroupId?.name && <Badge variant="light" size="xs">{r.itemId.itemGroupId.name}</Badge>}
-                      {r.materialCentreId?.name && <Badge variant="light" size="xs" color="teal">{r.materialCentreId.name}</Badge>}
-                    </Group>
-                  </div>
-                  <Text fw={700} size="md">{r.quantity} <Text span size="xs" c="dimmed">{r.itemId?.unit || ''}</Text></Text>
-                </Group>
-              </Card>
-            )}
-          />
+          {!stockSelectOpen && (
+            <DataTable
+              columns={stockColumns}
+              data={stockData}
+              loading={stockLoading}
+              emptyMessage="No stock data found"
+              mobileRender={(r) => (
+                <Card key={r._id} withBorder padding="sm">
+                  <Group justify="space-between" wrap="nowrap">
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <Text fw={600} truncate>{r.itemId?.name || 'Unknown'}</Text>
+                      <Text size="xs" c="dimmed" ff="monospace">{r.itemId?.sku || '-'}</Text>
+                      <Group gap={6} mt={4}>
+                        {r.itemId?.itemGroupId?.name && <Badge variant="light" size="xs">{r.itemId.itemGroupId.name}</Badge>}
+                        {r.materialCentreId?.name && <Badge variant="light" size="xs" color="teal">{r.materialCentreId.name}</Badge>}
+                      </Group>
+                    </div>
+                    <Text fw={700} size="md">{r.quantity} <Text span size="xs" c="dimmed">{r.itemId?.unit || ''}</Text></Text>
+                  </Group>
+                </Card>
+              )}
+            />
+          )}
         </Tabs.Panel>
 
         <Tabs.Panel value="centres">

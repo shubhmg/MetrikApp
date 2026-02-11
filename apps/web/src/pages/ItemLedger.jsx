@@ -81,6 +81,7 @@ export default function ItemLedger() {
   const [mcFilter, setMcFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [selectOpen, setSelectOpen] = useState(false);
 
   useEffect(() => {
     api.get(`/items/${id}`)
@@ -176,6 +177,12 @@ export default function ItemLedger() {
             data={mcOptions}
             value={mcFilter}
             onChange={(v) => setMcFilter(v || '')}
+            comboboxProps={{
+              withinPortal: true,
+              position: 'bottom-start',
+              onDropdownOpen: () => setSelectOpen(true),
+              onDropdownClose: () => setSelectOpen(false),
+            }}
           />
         </Group>
 
@@ -207,7 +214,7 @@ export default function ItemLedger() {
       {loading && <Center py="xl"><Loader /></Center>}
       {error && !loading && <Alert color="red" mb="md">{error}</Alert>}
 
-      {!loading && ledger && (
+      {!loading && ledger && !selectOpen && (
         <Box visibleFrom="sm">
           <Table striped highlightOnHover withTableBorder withColumnBorders verticalSpacing="sm">
             <Table.Thead>
@@ -319,7 +326,7 @@ export default function ItemLedger() {
         </Box>
       )}
 
-      {!loading && ledger && (
+      {!loading && ledger && !selectOpen && (
         <Box hiddenFrom="sm">
           <Card withBorder padding={0} radius="md">
             <Table striped withTableBorder verticalSpacing="xs">

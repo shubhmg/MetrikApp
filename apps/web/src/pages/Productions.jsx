@@ -79,6 +79,7 @@ export default function Productions() {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
   const [statusFilter, setStatusFilter] = useState(null);
+  const [selectOpen, setSelectOpen] = useState(false);
   const isMobile = useMediaQuery('(max-width: 48em)');
 
   useEffect(() => { loadVouchers(); }, [page, statusFilter]);
@@ -132,6 +133,12 @@ export default function Productions() {
             { value: 'cancelled', label: 'Cancelled' },
           ]}
           style={{ width: isMobile ? '100%' : 140 }}
+          comboboxProps={{
+            withinPortal: true,
+            position: 'bottom-start',
+            onDropdownOpen: () => setSelectOpen(true),
+            onDropdownClose: () => setSelectOpen(false),
+          }}
         />
       </PageHeader>
 
@@ -139,7 +146,7 @@ export default function Productions() {
         <Center py="xl"><Loader /></Center>
       ) : vouchers.length === 0 ? (
         <Text c="dimmed" ta="center" py="xl">No production vouchers found</Text>
-      ) : (
+      ) : !selectOpen && (
         <>
           {Object.entries(groupedVouchers).map(([date, list]) => (
             <ProductionGroup key={date} date={date} vouchers={list} onClick={viewDetail} />

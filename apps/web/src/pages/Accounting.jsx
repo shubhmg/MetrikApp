@@ -54,6 +54,7 @@ export default function Accounting() {
   const [error, setError] = useState('');
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [selectOpen, setSelectOpen] = useState(false);
   const isMobile = useMediaQuery('(max-width: 48em)');
 
   const form = useForm({ initialValues: EMPTY_FORM });
@@ -152,6 +153,12 @@ export default function Accounting() {
           onChange={setTypeFilter}
           clearable
           w={isMobile ? '100%' : 160}
+          comboboxProps={{
+            withinPortal: true,
+            position: 'bottom-start',
+            onDropdownOpen: () => setSelectOpen(true),
+            onDropdownClose: () => setSelectOpen(false),
+          }}
         />
         <TextInput placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} w={isMobile ? '100%' : 200} />
       </PageHeader>
@@ -160,7 +167,7 @@ export default function Accounting() {
         <Center py="xl"><Loader size="sm" /></Center>
       ) : filtered.length === 0 ? (
         <Text c="dimmed" ta="center" py="xl">No accounts found</Text>
-      ) : (
+      ) : !selectOpen && (
         Object.entries(grouped).map(([type, accs]) => {
           const meta = TYPE_MAP[type] || { label: type, color: 'gray' };
           return (
