@@ -26,6 +26,7 @@ import { DateInput } from '@mantine/dates';
 import { IconPlus, IconTrash, IconArrowLeft } from '@tabler/icons-react';
 import api from '../services/api.js';
 import { usePermission } from '../hooks/usePermission.js';
+import { useAuthStore } from '../store/authStore.js';
 
 const TYPE_GROUPS = [
   {
@@ -73,10 +74,16 @@ const TRANSFER_TYPE = 'stock_transfer';
 
 const EMPTY_ITEM_LINE = { itemId: '', quantity: 1, rate: 0, discount: 0, gstRate: 18 };
 const EMPTY_ACCOUNT_LINE = { accountId: '', debit: 0, credit: 0, narration: '' };
+const DOZEN_UNITS = new Set(['dozen', 'dozens', 'doz', 'dzn', 'dz']);
+
+function isDozenUnit(unit) {
+  return DOZEN_UNITS.has(String(unit || '').trim().toLowerCase());
+}
 
 export default function VoucherCreate() {
   const navigate = useNavigate();
-  const { can } = usePermission();
+  const { can, role } = usePermission();
+  const user = useAuthStore((s) => s.user);
   const [searchParams] = useSearchParams();
   const { id: editId } = useParams();
   const isEditMode = !!editId;
@@ -84,6 +91,9 @@ export default function VoucherCreate() {
   const [voucherDate, setVoucherDate] = useState(new Date());
   const [partyId, setPartyId] = useState(null);
   const [materialCentreId, setMaterialCentreId] = useState(null);
+  const [outputMaterialCentreId, setOutputMaterialCentreId] = useState(null);
+  const [productionMode, setProductionMode] = useState('manual');
+  const [contractorPartyId, setContractorPartyId] = useState(null);
   const [fromMaterialCentreId, setFromMaterialCentreId] = useState(null);
   const [toMaterialCentreId, setToMaterialCentreId] = useState(null);
   const [narration, setNarration] = useState('');
@@ -109,16 +119,16 @@ export default function VoucherCreate() {
   useEffect(() => {
     async function loadRef() {
       try {
-        const [p, i, a, m] = await Promise.all([
+        const [p, i, a, m] = await Promise.allSettled([
           api.get('/parties'),
           api.get('/items'),
           api.get('/accounts'),
           api.get('/material-centres/lookup'),
         ]);
-        setParties(p.data.data.parties);
-        setItems(i.data.data.items);
-        setAccounts(a.data.data.accounts);
-        setMcs(m.data.data.materialCentres);
+        if (p.status === 'fulfilled') setParties(p.value.data.data.parties || []);
+        if (i.status === 'fulfilled') setItems(i.value.data.data.items || []);
+        if (a.status === 'fulfilled') setAccounts(a.value.data.data.accounts || []);
+        if (m.status === 'fulfilled') setMcs(m.value.data.data.materialCentres || []);
       } catch { /* ignore */ }
       setLoadingRef(false);
     }
@@ -136,6 +146,9 @@ export default function VoucherCreate() {
         setVoucherDate(new Date(v.date));
         setPartyId(v.partyId?._id || v.partyId || null);
         setMaterialCentreId(v.materialCentreId?._id || v.materialCentreId || null);
+        setOutputMaterialCentreId(v.outputMaterialCentreId?._id || v.outputMaterialCentreId || null);
+        setProductionMode(v.productionMode || 'manual');
+        setContractorPartyId(v.contractorPartyId?._id || v.contractorPartyId || null);
         setFromMaterialCentreId(v.fromMaterialCentreId || null);
         setToMaterialCentreId(v.toMaterialCentreId || null);
         setNarration(v.narration || '');
@@ -190,6 +203,7 @@ export default function VoucherCreate() {
   const isSimpleMode = (voucherType === 'receipt' || voucherType === 'payment') && partyId;
 
   const isProduction = voucherType === 'production';
+  const isContractorProduction = isProduction && productionMode === 'contractor';
 
   const partyData = useMemo(() => parties.map((p) => ({ value: p._id, label: p.name })), [parties]);
   const itemData = useMemo(() => items.map((i) => ({ value: i._id, label: `${i.sku} - ${i.name}` })), [items]);
@@ -206,6 +220,76 @@ export default function VoucherCreate() {
     });
     return list.length ? list : items;
   }, [items]);
+  const contractors = useMemo(
+    () => parties.filter((p) => {
+      if (!(p.type?.includes('contractor') && p.contractorSettings?.isEnabled)) return false;
+      if (role !== 'contractor') return true;
+      const linkedUserId = p.contractorSettings?.linkedUserId?._id || p.contractorSettings?.linkedUserId;
+      return String(linkedUserId) === String(user?._id);
+    }),
+    [parties, role, user]
+  );
+  const contractorData = useMemo(
+    () => contractors.map((p) => ({ value: p._id, label: p.name })),
+    [contractors]
+  );
+  const selectedContractor = useMemo(
+    () => contractors.find((p) => p._id === contractorPartyId) || null,
+    [contractors, contractorPartyId]
+  );
+  const contractorItemOptions = useMemo(() => {
+    const map = new Map(items.map((i) => [i._id, i]));
+    return (selectedContractor?.contractorSettings?.itemRates || [])
+      .map((r) => {
+        const item = map.get(r.itemId);
+        if (!item) return null;
+        return { value: item._id, label: `${item.sku} - ${item.name}` };
+      })
+      .filter(Boolean);
+  }, [selectedContractor, items]);
+  const contractorAmount = useMemo(() => {
+    if (!isContractorProduction || !selectedContractor) return 0;
+    const output = itemLines[0] || {};
+    if (!output.itemId || !output.quantity) return 0;
+    const cfg = (selectedContractor.contractorSettings?.itemRates || []).find((r) => String(r.itemId) === String(output.itemId));
+    if (!cfg) return 0;
+    const outputItem = items.find((i) => String(i._id) === String(output.itemId));
+    const qty = Number(output.quantity || 0);
+    const rate = Number(cfg.rate || 0);
+    const amount = cfg.rateUom === 'per_dozen'
+      ? (isDozenUnit(outputItem?.unit) ? qty * rate : (qty / 12) * rate)
+      : qty * rate;
+    return Number(amount.toFixed(2));
+  }, [isContractorProduction, selectedContractor, itemLines, items]);
+
+  useEffect(() => {
+    if (role === 'contractor' && !isEditMode && voucherType !== 'production') {
+      setVoucherType('production');
+    }
+  }, [role, isEditMode, voucherType]);
+
+  useEffect(() => {
+    if (role === 'contractor' && isProduction && productionMode !== 'contractor') {
+      setProductionMode('contractor');
+    }
+  }, [role, isProduction, productionMode]);
+
+  useEffect(() => {
+    if (role !== 'contractor' || !isProduction || contractors.length === 0) return;
+    const ownContractor = contractors[0];
+    const consumeMc = ownContractor.contractorSettings?.consumeMaterialCentreId?._id || ownContractor.contractorSettings?.consumeMaterialCentreId || null;
+    const outputMc = ownContractor.contractorSettings?.outputMaterialCentreId?._id || ownContractor.contractorSettings?.outputMaterialCentreId || null;
+
+    if (contractorPartyId !== ownContractor._id) {
+      setContractorPartyId(ownContractor._id);
+    }
+    if (materialCentreId !== consumeMc) {
+      setMaterialCentreId(consumeMc);
+    }
+    if (outputMaterialCentreId !== outputMc) {
+      setOutputMaterialCentreId(outputMc);
+    }
+  }, [role, isProduction, contractors, contractorPartyId, materialCentreId, outputMaterialCentreId]);
 
   // Fetch active BOM when output item changes for production vouchers
   async function fetchBomForItem(outputItemId) {
@@ -267,6 +351,12 @@ export default function VoucherCreate() {
     // For production: when output item (idx 0) changes, fetch BOM
     if (isProduction && idx === 0 && field === 'itemId') {
       fetchBomForItem(value);
+      if (isContractorProduction && selectedContractor) {
+        const cfg = (selectedContractor.contractorSettings?.itemRates || []).find((r) => String(r.itemId) === String(value));
+        if (!cfg) {
+          notifications.show({ title: 'Not assigned', message: 'This item is not assigned to selected contractor.', color: 'red' });
+        }
+      }
     }
     // For production: when output quantity (idx 0) changes and BOM selected, expand
     if (isProduction && idx === 0 && field === 'quantity' && selectedBomId && value > 0) {
@@ -350,12 +440,20 @@ export default function VoucherCreate() {
   }, [accountLines]);
 
   async function handleSave() {
+    if (role === 'contractor' && voucherType !== 'production') {
+      notifications.show({ title: 'Not allowed', message: 'Contractor users can only create production vouchers', color: 'red' });
+      return;
+    }
     if (voucherType && !can(voucherType, 'write')) {
       notifications.show({ title: 'Not allowed', message: 'You do not have permission to create this voucher type', color: 'red' });
       return;
     }
     if (!voucherType) {
       notifications.show({ title: 'Select type', message: 'Please select a voucher type', color: 'red' });
+      return;
+    }
+    if (role === 'contractor' && !contractorPartyId) {
+      notifications.show({ title: 'Contractor not linked', message: 'No contractor profile is linked to this user.', color: 'red' });
       return;
     }
 
@@ -372,6 +470,14 @@ export default function VoucherCreate() {
       if (needsParty && partyId) payload.partyId = partyId;
       if (needsMc && materialCentreId) payload.materialCentreId = materialCentreId;
       if (isProduction && selectedBomId) payload.bomId = selectedBomId;
+      if (isProduction) {
+        payload.productionMode = role === 'contractor' ? 'contractor' : productionMode;
+        payload.outputMaterialCentreId = outputMaterialCentreId || materialCentreId;
+        if ((role === 'contractor') || isContractorProduction) {
+          payload.contractorPartyId = contractorPartyId;
+          payload.contractorAmount = contractorAmount;
+        }
+      }
       if (isTransfer) {
         payload.fromMaterialCentreId = fromMaterialCentreId;
         payload.toMaterialCentreId = toMaterialCentreId;
@@ -468,7 +574,7 @@ export default function VoucherCreate() {
             />
           )}
 
-          {needsMc && !isTransfer && (
+          {needsMc && !isTransfer && !(isProduction && productionMode === 'contractor') && (
             quickMcOptions.length > 0 ? (
               <Stack gap={6} style={{ marginTop: 4 }}>
                 <Text size="sm" fw={600} mb={4}>Material Centre</Text>
@@ -493,6 +599,47 @@ export default function VoucherCreate() {
                 clearable
               />
             )
+          )}
+
+          {isProduction && (
+            <>
+              <Select
+                label="Production Mode"
+                data={[
+                  { value: 'manual', label: 'Manual Production' },
+                  { value: 'contractor', label: 'Contractor Production' },
+                ]}
+                value={productionMode}
+                onChange={(v) => setProductionMode(v || 'manual')}
+                disabled={role === 'contractor'}
+              />
+              {productionMode === 'contractor' && (
+                <Select
+                  label="Contractor"
+                  placeholder="Select contractor..."
+                  data={contractorData}
+                  value={contractorPartyId}
+                  onChange={(v) => {
+                    setContractorPartyId(v);
+                    const contractor = contractors.find((p) => p._id === v);
+                    setMaterialCentreId(contractor?.contractorSettings?.consumeMaterialCentreId || null);
+                    setOutputMaterialCentreId(contractor?.contractorSettings?.outputMaterialCentreId || null);
+                    setItemLines([{ ...EMPTY_ITEM_LINE }]);
+                  }}
+                  searchable
+                  disabled={role === 'contractor'}
+                />
+              )}
+              {productionMode === 'contractor' && (
+                <Select
+                  label="Output Material Centre"
+                  data={mcData}
+                  value={outputMaterialCentreId}
+                  onChange={setOutputMaterialCentreId}
+                  searchable
+                />
+              )}
+            </>
           )}
 
           {isTransfer && (
@@ -543,7 +690,7 @@ export default function VoucherCreate() {
                 <SimpleGrid cols={{ base: 1, sm: 3 }}>
                   <Select
                     label="Item"
-                    data={itemData}
+                    data={isContractorProduction ? contractorItemOptions : itemData}
                     value={itemLines[0]?.itemId || null}
                     onChange={(v) => updateItemLine(0, 'itemId', v)}
                     searchable
@@ -660,6 +807,12 @@ export default function VoucherCreate() {
                     <Text size="sm">Output Cost / Unit:</Text>
                     <Text size="sm" fw={700} c="green">{outputCostPerUnit.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
                   </Group>
+                  {isContractorProduction && (
+                    <Group justify="space-between">
+                      <Text size="sm">Contractor Charges:</Text>
+                      <Text size="sm" fw={700} c="teal">{contractorAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
+                    </Group>
+                  )}
                 </Stack>
               </Card>
             </Stack>

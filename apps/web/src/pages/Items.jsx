@@ -43,6 +43,7 @@ export default function Items() {
   const canDelete = can('item', 'delete');
   const [items, setItems] = useState([]);
   const [groups, setGroups] = useState([]);
+  const [units, setUnits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [groupFilter, setGroupFilter] = useState('');
 
@@ -58,7 +59,7 @@ export default function Items() {
   const [graphsOpen, setGraphsOpen] = useState(false);
 
   const itemForm = useForm({
-    initialValues: { name: '', sku: '', itemGroupId: '', unit: 'pcs', hsnCode: '', gstRate: 18, salesPrice: 0, reorderLevel: 0 },
+    initialValues: { name: '', sku: '', itemGroupId: '', unitId: '', hsnCode: '', gstRate: 18, salesPrice: 0, reorderLevel: 0 },
   });
   const groupForm = useForm({
     initialValues: { name: '', code: '', type: 'raw_material' },
@@ -75,12 +76,14 @@ export default function Items() {
   async function loadAll() {
     setLoading(true);
     try {
-      const [itemsRes, groupsRes] = await Promise.all([
+      const [itemsRes, groupsRes, unitsRes] = await Promise.all([
         api.get('/items'),
         api.get('/items/groups'),
+        api.get('/items/units'),
       ]);
       setItems(itemsRes.data.data.items);
       setGroups(groupsRes.data.data.itemGroups);
+      setUnits(unitsRes.data.data.units || []);
     } catch { /* ignore */ }
     setLoading(false);
   }
@@ -88,7 +91,16 @@ export default function Items() {
   // --- Items ---
   function openItemCreate() {
     setEditingId(null);
-    itemForm.setValues({ name: '', sku: '', itemGroupId: groups[0]?._id || '', unit: 'pcs', hsnCode: '', gstRate: 18, salesPrice: 0, reorderLevel: 0 });
+    itemForm.setValues({
+      name: '',
+      sku: '',
+      itemGroupId: groups[0]?._id || '',
+      unitId: units[0]?._id || '',
+      hsnCode: '',
+      gstRate: 18,
+      salesPrice: 0,
+      reorderLevel: 0,
+    });
     setError('');
     setModalType('item');
   }
@@ -98,7 +110,7 @@ export default function Items() {
       name: item.name,
       sku: item.sku,
       itemGroupId: item.itemGroupId?._id || item.itemGroupId || '',
-      unit: item.unit,
+      unitId: item.unitId?._id || item.unitId || '',
       hsnCode: item.hsnCode || '',
       gstRate: item.gstRate ?? 18,
       salesPrice: item.salesPrice || 0,
@@ -183,7 +195,7 @@ export default function Items() {
     { key: 'sku', label: 'SKU', render: (r) => r.sku, style: { fontFamily: 'monospace' } },
     { key: 'name', label: 'Name', render: (r) => r.name },
     { key: 'group', label: 'Group', render: (r) => r.itemGroupId?.name || '-' },
-    { key: 'unit', label: 'Unit', render: (r) => r.unit },
+    { key: 'unit', label: 'Unit', render: (r) => r.unitId?.symbol || r.unit || '-' },
     { key: 'gstRate', label: 'GST %', render: (r) => `${r.gstRate}%` },
     {
       key: 'actions', label: '',
@@ -296,7 +308,7 @@ export default function Items() {
                     <Text size="xs" c="dimmed" ff="monospace">{r.sku}</Text>
                     <Group gap={6} mt={4}>
                       {r.itemGroupId?.name && <Badge variant="light" size="sm">{r.itemGroupId.name}</Badge>}
-                      <Text size="xs" c="dimmed">{r.unit}</Text>
+                      <Text size="xs" c="dimmed">{r.unitId?.symbol || r.unit || '-'}</Text>
                       <Text size="xs" c="dimmed">GST {r.gstRate}%</Text>
                     </Group>
                   </div>
@@ -352,7 +364,13 @@ export default function Items() {
               searchable
               {...itemForm.getInputProps('itemGroupId')}
             />
-            <TextInput label="Unit" required {...itemForm.getInputProps('unit')} />
+            <Select
+              label="Unit"
+              data={units.map((u) => ({ value: u._id, label: `${u.symbol} - ${u.name}` }))}
+              required
+              searchable
+              {...itemForm.getInputProps('unitId')}
+            />
             <TextInput label="HSN Code" {...itemForm.getInputProps('hsnCode')} />
             <NumberInput label="GST Rate (%)" min={0} max={100} {...itemForm.getInputProps('gstRate')} />
             <NumberInput label="Sales Price" min={0} decimalScale={2} {...itemForm.getInputProps('salesPrice')} />

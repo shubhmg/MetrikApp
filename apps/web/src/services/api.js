@@ -6,6 +6,20 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+let refreshPromise = null;
+
+async function refreshAccessTokenOnce(refreshToken) {
+  if (!refreshPromise) {
+    refreshPromise = axios
+      .post('/api/auth/refresh', { refreshToken })
+      .then((res) => res.data.data)
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+  return refreshPromise;
+}
+
 // Request interceptor: attach auth token and business context
 api.interceptors.request.use((config) => {
   const { accessToken, currentBusinessId } = useAuthStore.getState();
@@ -37,9 +51,9 @@ api.interceptors.response.use(
       }
 
       try {
-        const { data } = await axios.post('/api/auth/refresh', { refreshToken });
-        setTokens(data.data.accessToken, data.data.refreshToken);
-        original.headers.Authorization = `Bearer ${data.data.accessToken}`;
+        const tokens = await refreshAccessTokenOnce(refreshToken);
+        setTokens(tokens.accessToken, tokens.refreshToken);
+        original.headers.Authorization = `Bearer ${tokens.accessToken}`;
         return api(original);
       } catch {
         logout();

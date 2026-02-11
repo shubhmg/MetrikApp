@@ -72,7 +72,7 @@ export default function AppShell() {
   const [sidebarOpened, setSidebarOpened] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const { user, logout } = useAuth();
-  const { canAny } = usePermission();
+  const { canAny, role } = usePermission();
   const location = useLocation();
   const navigate = useNavigate();
   const { colorScheme, toggleColorScheme } = useMantineColorScheme();
@@ -83,9 +83,16 @@ export default function AppShell() {
     location.pathname.includes('/ledger') ||
     location.pathname.startsWith('/vouchers/')
   );
+  const isContractorUser = role === 'contractor';
 
   // Filter nav items by permission
   const NAV_ITEMS = useMemo(() => {
+    if (isContractorUser) {
+      return [
+        { path: '/productions', label: 'Productions', icon: IconTool, module: 'production' },
+        { path: '/parties', label: 'My Ledger', icon: IconUsers, module: 'party' },
+      ];
+    }
     return ALL_NAV_ITEMS.map((entry) => {
       if (entry.path) {
         // Top-level item
@@ -101,7 +108,7 @@ export default function AppShell() {
       }
       return entry;
     }).filter(Boolean);
-  }, [canAny]);
+  }, [canAny, isContractorUser]);
 
   // Flat list for "More" drawer
   const MORE_ITEMS = useMemo(() => {
@@ -114,7 +121,10 @@ export default function AppShell() {
   }, [NAV_ITEMS]);
 
   // Bottom tabs — filtered by permission
-  const ALL_BOTTOM_TABS = [
+  const ALL_BOTTOM_TABS = isContractorUser ? [
+    { path: '/productions', label: 'Productions', icon: IconTool, module: 'production' },
+    { path: '/parties', label: 'Ledger', icon: IconUsers, module: 'party' },
+  ] : [
     { path: '/', label: 'Home', icon: IconLayoutDashboard, module: 'dashboard' },
     { path: '/sales-orders', label: 'Orders', icon: IconClipboardList, module: 'sales_order' },
     { path: '__more__', label: 'More', icon: IconPlus },

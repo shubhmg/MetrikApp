@@ -44,6 +44,7 @@ function ProductionGroup({ date, vouchers, onClick }) {
                     <Group gap="xs">
                       <Text size="xs" c="dimmed" ff="monospace">{v.voucherNumber}</Text>
                       {v.status === 'cancelled' && <Badge size="xs" variant="dot" color="red">cancelled</Badge>}
+                      {v.productionMode === 'contractor' && <Badge size="xs" variant="light" color="teal">contractor</Badge>}
                     </Group>
                   </Box>
                   <Box style={{ textAlign: 'right' }}>

@@ -21,6 +21,8 @@ import { useMediaQuery } from '@mantine/hooks';
 import { IconArrowLeft } from '@tabler/icons-react';
 import dayjs from 'dayjs';
 import api from '../services/api.js';
+import { usePermission } from '../hooks/usePermission.js';
+import { useAuthStore } from '../store/authStore.js';
 
 function getFinancialYear() {
   const d = new Date();
@@ -74,12 +76,15 @@ const VOUCHER_TYPE_LABELS = {
 export default function PartyLedger() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { role } = usePermission();
+  const user = useAuthStore((s) => s.user);
   const [fy, setFy] = useState(getFinancialYear());
   const [party, setParty] = useState(null);
   const [ledger, setLedger] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const isMobile = useMediaQuery('(max-width: 48em)');
+  const backPath = role === 'contractor' ? '/productions' : '/parties';
 
   useEffect(() => {
     api.get(`/parties/${id}`)
@@ -88,12 +93,18 @@ export default function PartyLedger() {
   }, [id]);
 
   useEffect(() => {
-    if (!party?.linkedAccountId) return;
-    const accountId = typeof party.linkedAccountId === 'object' ? party.linkedAccountId._id : party.linkedAccountId;
-    if (!accountId) return;
+    if (role !== 'contractor' || !party) return;
+    const linkedUserId = party.contractorSettings?.linkedUserId?._id || party.contractorSettings?.linkedUserId;
+    if (String(linkedUserId) !== String(user?._id)) {
+      navigate('/parties', { replace: true });
+    }
+  }, [role, party, user, navigate]);
+
+  useEffect(() => {
+    if (!party?._id) return;
     setLoading(true);
     setError(null);
-    api.get(`/accounts/${accountId}/ledger`, { params: { financialYear: fy } })
+    api.get(`/parties/${party._id}/ledger`, { params: { financialYear: fy } })
       .then((res) => setLedger(res.data.data))
       .catch((err) => setError(err.response?.data?.message || 'Failed to load ledger'))
       .finally(() => setLoading(false));
@@ -117,7 +128,7 @@ export default function PartyLedger() {
     return (
       <div>
         <Group mb="lg">
-          <ActionIcon variant="subtle" onClick={() => navigate('/parties')}><IconArrowLeft size={20} /></ActionIcon>
+          <ActionIcon variant="subtle" onClick={() => navigate(backPath, { replace: role === 'contractor' })}><IconArrowLeft size={20} /></ActionIcon>
           <Title order={2}>Party Ledger</Title>
         </Group>
         <Alert color="red">{error}</Alert>
@@ -129,7 +140,7 @@ export default function PartyLedger() {
     <div>
       {/* Header */}
       <Group mb="xs">
-        <ActionIcon variant="subtle" onClick={() => navigate('/parties')}><IconArrowLeft size={20} /></ActionIcon>
+        <ActionIcon variant="subtle" onClick={() => navigate(backPath, { replace: role === 'contractor' })}><IconArrowLeft size={20} /></ActionIcon>
         <div>
           <Title order={2}>{party?.name || 'Party Ledger'}</Title>
           {party && (

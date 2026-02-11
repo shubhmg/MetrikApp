@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { createBrowserRouter, Navigate, useLocation } from 'react-router-dom';
 import AppShell from './components/layout/AppShell.jsx';
 import Login from './pages/Login.jsx';
 import Dashboard from './pages/Dashboard.jsx';
@@ -38,6 +38,18 @@ function PermissionRoute({ module, children }) {
   return children;
 }
 
+function NonContractorRoute({ children }) {
+  const { role } = usePermission();
+  if (role === 'contractor') return <Navigate to="/productions" replace />;
+  return children;
+}
+
+function HomeRoute() {
+  const { role } = usePermission();
+  if (role === 'contractor') return <Navigate to="/productions" replace />;
+  return <Dashboard />;
+}
+
 function VoucherRoute({ children }) {
   const { can } = usePermission();
   const voucherModules = [
@@ -59,6 +71,19 @@ function VoucherRoute({ children }) {
   ];
   const canAnyVoucher = voucherModules.some((m) => can(m, 'read') || can(m, 'write') || can(m, 'delete'));
   if (!canAnyVoucher) return <Navigate to="/" replace />;
+  return children;
+}
+
+function ContractorProductionCreateRoute({ children }) {
+  const { role } = usePermission();
+  const location = useLocation();
+  if (role !== 'contractor') return children;
+
+  const params = new URLSearchParams(location.search);
+  const type = params.get('type');
+  if (type && type !== 'production') {
+    return <Navigate to="/vouchers/new?type=production" replace />;
+  }
   return children;
 }
 
@@ -88,23 +113,23 @@ export const router = createBrowserRouter([
       </ProtectedRoute>
     ),
     children: [
-      { index: true, element: <Dashboard /> },
-      { path: 'items', element: <PermissionRoute module="item"><Items /></PermissionRoute> },
-      { path: 'items/:id/ledger', element: <PermissionRoute module="item"><ItemLedger /></PermissionRoute> },
-      { path: 'boms', element: <PermissionRoute module="bom"><Boms /></PermissionRoute> },
+      { index: true, element: <HomeRoute /> },
+      { path: 'items', element: <NonContractorRoute><PermissionRoute module="item"><Items /></PermissionRoute></NonContractorRoute> },
+      { path: 'items/:id/ledger', element: <NonContractorRoute><PermissionRoute module="item"><ItemLedger /></PermissionRoute></NonContractorRoute> },
+      { path: 'boms', element: <NonContractorRoute><PermissionRoute module="bom"><Boms /></PermissionRoute></NonContractorRoute> },
       { path: 'productions', element: <PermissionRoute module="production"><Productions /></PermissionRoute> },
-      { path: 'sales-orders', element: <PermissionRoute module="sales_order"><SalesOrders /></PermissionRoute> },
-      { path: 'purchase-orders', element: <PermissionRoute module="purchase_order"><PurchaseOrders /></PermissionRoute> },
-      { path: 'sales-invoices', element: <PermissionRoute module="sales_invoice"><SalesInvoices /></PermissionRoute> },
-      { path: 'receipts', element: <PermissionRoute module="receipt"><Receipts /></PermissionRoute> },
-      { path: 'vouchers', element: <VoucherRoute><Vouchers /></VoucherRoute> },
-      { path: 'vouchers/new', element: <VoucherRoute><VoucherCreate /></VoucherRoute> },
-      { path: 'vouchers/:id/edit', element: <VoucherRoute><VoucherCreate /></VoucherRoute> },
-      { path: 'inventory', element: <PermissionRoute module="inventory"><Inventory /></PermissionRoute> },
+      { path: 'sales-orders', element: <NonContractorRoute><PermissionRoute module="sales_order"><SalesOrders /></PermissionRoute></NonContractorRoute> },
+      { path: 'purchase-orders', element: <NonContractorRoute><PermissionRoute module="purchase_order"><PurchaseOrders /></PermissionRoute></NonContractorRoute> },
+      { path: 'sales-invoices', element: <NonContractorRoute><PermissionRoute module="sales_invoice"><SalesInvoices /></PermissionRoute></NonContractorRoute> },
+      { path: 'receipts', element: <NonContractorRoute><PermissionRoute module="receipt"><Receipts /></PermissionRoute></NonContractorRoute> },
+      { path: 'vouchers', element: <NonContractorRoute><VoucherRoute><Vouchers /></VoucherRoute></NonContractorRoute> },
+      { path: 'vouchers/new', element: <ContractorProductionCreateRoute><VoucherRoute><VoucherCreate /></VoucherRoute></ContractorProductionCreateRoute> },
+      { path: 'vouchers/:id/edit', element: <NonContractorRoute><VoucherRoute><VoucherCreate /></VoucherRoute></NonContractorRoute> },
+      { path: 'inventory', element: <NonContractorRoute><PermissionRoute module="inventory"><Inventory /></PermissionRoute></NonContractorRoute> },
       { path: 'parties', element: <PermissionRoute module="party"><Parties /></PermissionRoute> },
       { path: 'parties/:id/ledger', element: <PermissionRoute module="party"><PartyLedger /></PermissionRoute> },
       { path: 'accounting', element: <PermissionRoute module="accounting"><Accounting /></PermissionRoute> },
-      { path: 'members', element: <PermissionRoute module="member"><Members /></PermissionRoute> },
+      { path: 'members', element: <NonContractorRoute><PermissionRoute module="member"><Members /></PermissionRoute></NonContractorRoute> },
       { path: 'settings', element: <Placeholder title="Settings" /> },
     ],
   },

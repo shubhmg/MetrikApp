@@ -33,6 +33,7 @@ const ROLE_OPTIONS = [
   { value: 'manager', label: 'Manager' },
   { value: 'accountant', label: 'Accountant' },
   { value: 'operator', label: 'Operator' },
+  { value: 'contractor', label: 'Contractor' },
   { value: 'viewer', label: 'Viewer' },
 ];
 
@@ -42,6 +43,7 @@ const ROLE_COLORS = {
   manager: 'violet',
   accountant: 'orange',
   operator: 'cyan',
+  contractor: 'lime',
   viewer: 'gray',
 };
 

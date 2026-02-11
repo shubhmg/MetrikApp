@@ -52,7 +52,14 @@ export default function ProductionDetailModal({ voucher, onClose, onUpdate }) {
               </Text>
             )}
             <Text size="sm"><strong>MC:</strong> {voucher.materialCentreId?.name || '-'}</Text>
+            <Text size="sm"><strong>Output MC:</strong> {voucher.outputMaterialCentreId?.name || voucher.materialCentreId?.name || '-'}</Text>
             <Text size="sm"><strong>FY:</strong> {voucher.financialYear}</Text>
+            {voucher.productionMode === 'contractor' && (
+              <Text size="sm"><strong>Contractor:</strong> {voucher.contractorPartyId?.name || '-'}</Text>
+            )}
+            {voucher.productionMode === 'contractor' && (
+              <Text size="sm"><strong>Charges:</strong> {fmtCurrency(voucher.contractorAmount || 0)}</Text>
+            )}
           </SimpleGrid>
 
           {voucher.bomId && (
