@@ -4,6 +4,15 @@ import softDelete from '../../plugins/softDelete.js';
 import auditFields from '../../plugins/auditFields.js';
 import { PARTY_TYPES } from '../../config/constants.js';
 
+const contractorItemRateSchema = new mongoose.Schema(
+  {
+    itemId: { type: mongoose.Schema.Types.ObjectId, ref: 'Item', required: true },
+    rate: { type: Number, default: 0, min: 0 },
+    rateUom: { type: String, enum: ['per_unit', 'per_dozen'], default: 'per_dozen' },
+  },
+  { _id: false }
+);
+
 const partySchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   type: [{
@@ -32,6 +41,13 @@ const partySchema = new mongoose.Schema({
     bankName: String,
     ifsc: String,
     branch: String,
+  },
+  contractorSettings: {
+    consumeMaterialCentreId: { type: mongoose.Schema.Types.ObjectId, ref: 'MaterialCentre' },
+    outputMaterialCentreId: { type: mongoose.Schema.Types.ObjectId, ref: 'MaterialCentre' },
+    linkedUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    itemRates: [contractorItemRateSchema],
+    isEnabled: { type: Boolean, default: false },
   },
   linkedAccountId: { type: mongoose.Schema.Types.ObjectId, ref: 'Account' },
   isActive: { type: Boolean, default: true },

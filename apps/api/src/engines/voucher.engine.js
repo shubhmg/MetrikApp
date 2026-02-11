@@ -129,26 +129,27 @@ async function supportsTransactions() {
  * Uses a transaction if replica set is available, otherwise runs without one (dev mode).
  */
 export async function create(data, businessId, userId) {
+  const workingData = { ...data, businessId, userId };
   const handler = getHandler(data.voucherType);
 
   // Type-specific validation
   if (handler.validate) {
-    await handler.validate(data);
+    await handler.validate(workingData);
   }
 
   const financialYear = getFinancialYear(new Date(data.date));
-  const prefix = VOUCHER_PREFIX[data.voucherType];
+  const prefix = VOUCHER_PREFIX[workingData.voucherType];
 
   // Generate voucher number (not in transaction — sequence is independent)
   const voucherNumber = await VoucherSequence.getNextNumber(
     businessId,
-    data.voucherType,
+    workingData.voucherType,
     financialYear,
     prefix
   );
 
   // Calculate totals from line items
-  const { subtotal, totalDiscount, totalTax, grandTotal } = calculateTotals(data.lineItems, data.voucherType);
+  const { subtotal, totalDiscount, totalTax, grandTotal } = calculateTotals(workingData.lineItems, workingData.voucherType);
 
   const useTxn = await supportsTransactions();
   let session = null;
@@ -162,7 +163,7 @@ export async function create(data, businessId, userId) {
     // Save the voucher as posted
     const now = new Date();
     const voucherDoc = new Voucher({
-      ...data,
+      ...workingData,
       businessId,
       voucherNumber,
       financialYear,
@@ -208,7 +209,7 @@ export async function create(data, businessId, userId) {
       action: 'create',
       module: 'voucher',
       documentId: voucherDoc._id,
-      documentType: data.voucherType,
+      documentType: workingData.voucherType,
       after: voucherDoc.toObject(),
     });
 
@@ -320,23 +321,30 @@ export async function update(voucherId, data, businessId, userId, req) {
   const before = voucher.toObject();
 
   // Validate new data using handler
+  const workingData = { ...data, voucherType: voucher.voucherType, businessId, userId };
   if (handler.validate) {
-    await handler.validate({ ...data, voucherType: voucher.voucherType });
+    await handler.validate(workingData);
   }
 
   // Recalculate totals
-  const { subtotal, totalDiscount, totalTax, grandTotal } = calculateTotals(data.lineItems, voucher.voucherType);
+  const { subtotal, totalDiscount, totalTax, grandTotal } = calculateTotals(workingData.lineItems, voucher.voucherType);
 
   if (NON_POSTING_TYPES.includes(voucher.voucherType)) {
     // --- Non-posting path: direct update ---
     voucher.date = newDate;
-    voucher.partyId = data.partyId || voucher.partyId;
-    voucher.materialCentreId = data.materialCentreId || voucher.materialCentreId;
-    voucher.lineItems = data.lineItems;
-    voucher.narration = data.narration ?? voucher.narration;
-    voucher.bomId = data.bomId || voucher.bomId;
-    voucher.fromMaterialCentreId = data.fromMaterialCentreId || voucher.fromMaterialCentreId;
-    voucher.toMaterialCentreId = data.toMaterialCentreId || voucher.toMaterialCentreId;
+    voucher.partyId = workingData.partyId || voucher.partyId;
+    voucher.materialCentreId = workingData.materialCentreId || voucher.materialCentreId;
+    voucher.lineItems = workingData.lineItems;
+    voucher.narration = workingData.narration ?? voucher.narration;
+    voucher.bomId = workingData.bomId || voucher.bomId;
+    voucher.outputMaterialCentreId = workingData.outputMaterialCentreId || workingData.materialCentreId || voucher.outputMaterialCentreId;
+    voucher.productionMode = workingData.productionMode || voucher.productionMode || 'manual';
+    voucher.contractorPartyId = workingData.contractorPartyId || null;
+    voucher.contractorRate = workingData.contractorRate ?? 0;
+    voucher.contractorRateUom = workingData.contractorRateUom ?? null;
+    voucher.contractorAmount = workingData.contractorAmount ?? 0;
+    voucher.fromMaterialCentreId = workingData.fromMaterialCentreId || voucher.fromMaterialCentreId;
+    voucher.toMaterialCentreId = workingData.toMaterialCentreId || voucher.toMaterialCentreId;
     voucher.subtotal = subtotal;
     voucher.totalDiscount = totalDiscount;
     voucher.totalTax = totalTax;
@@ -377,13 +385,19 @@ export async function update(voucherId, data, businessId, userId, req) {
 
     // Update voucher document with new data
     voucher.date = newDate;
-    voucher.partyId = data.partyId || voucher.partyId;
-    voucher.materialCentreId = data.materialCentreId || voucher.materialCentreId;
-    voucher.lineItems = data.lineItems;
-    voucher.narration = data.narration ?? voucher.narration;
-    voucher.bomId = data.bomId || voucher.bomId;
-    voucher.fromMaterialCentreId = data.fromMaterialCentreId || voucher.fromMaterialCentreId;
-    voucher.toMaterialCentreId = data.toMaterialCentreId || voucher.toMaterialCentreId;
+    voucher.partyId = workingData.partyId || voucher.partyId;
+    voucher.materialCentreId = workingData.materialCentreId || voucher.materialCentreId;
+    voucher.lineItems = workingData.lineItems;
+    voucher.narration = workingData.narration ?? voucher.narration;
+    voucher.bomId = workingData.bomId || voucher.bomId;
+    voucher.outputMaterialCentreId = workingData.outputMaterialCentreId || workingData.materialCentreId || voucher.outputMaterialCentreId;
+    voucher.productionMode = workingData.productionMode || voucher.productionMode || 'manual';
+    voucher.contractorPartyId = workingData.contractorPartyId || null;
+    voucher.contractorRate = workingData.contractorRate ?? 0;
+    voucher.contractorRateUom = workingData.contractorRateUom ?? null;
+    voucher.contractorAmount = workingData.contractorAmount ?? 0;
+    voucher.fromMaterialCentreId = workingData.fromMaterialCentreId || voucher.fromMaterialCentreId;
+    voucher.toMaterialCentreId = workingData.toMaterialCentreId || voucher.toMaterialCentreId;
     voucher.subtotal = subtotal;
     voucher.totalDiscount = totalDiscount;
     voucher.totalTax = totalTax;

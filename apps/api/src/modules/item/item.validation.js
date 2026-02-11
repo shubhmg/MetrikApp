@@ -28,7 +28,8 @@ export const createItemSchema = {
     name: Joi.string().min(1).max(200).required(),
     sku: Joi.string().min(1).max(50).required(),
     itemGroupId: Joi.string().required(),
-    unit: Joi.string().min(1).max(20).required(),
+    unitId: Joi.string().required(),
+    unit: Joi.string().min(1).max(20).optional(),
     hsnCode: Joi.string().max(20).allow('').optional(),
     gstRate: Joi.number().min(0).max(100).default(0),
     salesPrice: Joi.number().min(0).default(0),
@@ -41,6 +42,7 @@ export const updateItemSchema = {
   params: Joi.object({ id: Joi.string().required() }),
   body: Joi.object({
     name: Joi.string().min(1).max(200).optional(),
+    unitId: Joi.string().optional(),
     unit: Joi.string().min(1).max(20).optional(),
     hsnCode: Joi.string().max(20).allow('').optional(),
     gstRate: Joi.number().min(0).max(100).optional(),
@@ -56,6 +58,22 @@ export const listItemSchema = {
     itemGroupId: Joi.string().optional(),
     search: Joi.string().optional(),
   }),
+};
+
+export const createUnitSchema = {
+  body: Joi.object({
+    name: Joi.string().min(1).max(50).required(),
+    symbol: Joi.string().min(1).max(20).required(),
+  }),
+};
+
+export const updateUnitSchema = {
+  params: Joi.object({ id: Joi.string().required() }),
+  body: Joi.object({
+    name: Joi.string().min(1).max(50).optional(),
+    symbol: Joi.string().min(1).max(20).optional(),
+    isActive: Joi.boolean().optional(),
+  }).min(1),
 };
 
 export const getItemLedgerSchema = {

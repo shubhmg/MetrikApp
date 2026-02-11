@@ -62,3 +62,23 @@ export const getLedger = catchAsync(async (req, res) => {
   });
   res.json({ success: true, data: ledger });
 });
+
+export const listUnits = catchAsync(async (req, res) => {
+  const units = await itemService.listUnits(req.businessId, req.user._id);
+  res.json({ success: true, data: { units } });
+});
+
+export const createUnit = catchAsync(async (req, res) => {
+  const unit = await itemService.createUnit(req.body, req.businessId, req.user._id);
+  res.status(201).json({ success: true, data: { unit } });
+});
+
+export const updateUnit = catchAsync(async (req, res) => {
+  const unit = await itemService.updateUnit(req.params.id, req.body, req.businessId, req.user._id);
+  res.json({ success: true, data: { unit } });
+});
+
+export const deleteUnit = catchAsync(async (req, res) => {
+  await itemService.deleteUnit(req.params.id, req.businessId, req.user._id);
+  res.json({ success: true, message: 'Unit deleted' });
+});

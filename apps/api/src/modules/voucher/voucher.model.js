@@ -48,6 +48,12 @@ const voucherSchema = new mongoose.Schema({
 
   // Production / BOM
   bomId: { type: mongoose.Schema.Types.ObjectId, ref: 'BillOfMaterial' },
+  outputMaterialCentreId: { type: mongoose.Schema.Types.ObjectId, ref: 'MaterialCentre' },
+  productionMode: { type: String, enum: ['manual', 'contractor'], default: 'manual' },
+  contractorPartyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Party' },
+  contractorRate: { type: Number, default: 0 },
+  contractorRateUom: { type: String, enum: ['per_unit', 'per_dozen'] },
+  contractorAmount: { type: Number, default: 0 },
 
   // Stock transfer
   fromMaterialCentreId: { type: mongoose.Schema.Types.ObjectId, ref: 'MaterialCentre' },

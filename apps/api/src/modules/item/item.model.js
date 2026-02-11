@@ -6,6 +6,7 @@ const itemSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   sku: { type: String, required: true, trim: true },
   itemGroupId: { type: mongoose.Schema.Types.ObjectId, ref: 'ItemGroup', required: true },
+  unitId: { type: mongoose.Schema.Types.ObjectId, ref: 'Unit' },
   unit: { type: String, required: true, trim: true }, // kg, pcs, mtr, ltr, etc.
   hsnCode: { type: String, trim: true },
   gstRate: { type: Number, default: 0 }, // percentage e.g. 18

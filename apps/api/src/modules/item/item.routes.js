@@ -9,6 +9,8 @@ import {
   updateItemSchema,
   listItemSchema,
   getItemLedgerSchema,
+  createUnitSchema,
+  updateUnitSchema,
 } from './item.validation.js';
 
 const router = Router();
@@ -21,6 +23,11 @@ router.patch('/groups/:id', requirePermission('item:write'), validate(updateItem
 router.delete('/groups/:id', requirePermission('item:delete'), itemController.deleteGroup);
 
 // Item routes
+router.get('/units', requirePermission('item:read'), itemController.listUnits);
+router.post('/units', requirePermission('item:write'), validate(createUnitSchema), itemController.createUnit);
+router.patch('/units/:id', requirePermission('item:write'), validate(updateUnitSchema), itemController.updateUnit);
+router.delete('/units/:id', requirePermission('item:delete'), itemController.deleteUnit);
+
 router.post('/', requirePermission('item:write'), validate(createItemSchema), itemController.create);
 router.get('/', requirePermission('item:read'), validate(listItemSchema), itemController.list);
 router.get('/:id', requirePermission('item:read'), itemController.getById);

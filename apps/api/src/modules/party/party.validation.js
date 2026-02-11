@@ -2,6 +2,19 @@ import Joi from 'joi';
 import { PARTY_TYPES } from '../../config/constants.js';
 
 const partyTypeValues = Object.values(PARTY_TYPES);
+const contractorSettingsSchema = Joi.object({
+  consumeMaterialCentreId: Joi.string().allow(null).optional(),
+  outputMaterialCentreId: Joi.string().allow(null).optional(),
+  linkedUserId: Joi.string().allow(null).optional(),
+  isEnabled: Joi.boolean().optional(),
+  itemRates: Joi.array().items(
+    Joi.object({
+      itemId: Joi.string().required(),
+      rate: Joi.number().min(0).required(),
+      rateUom: Joi.string().valid('per_unit', 'per_dozen').default('per_dozen'),
+    })
+  ).optional(),
+}).optional();
 
 export const createPartySchema = {
   body: Joi.object({
@@ -29,6 +42,7 @@ export const createPartySchema = {
       ifsc: Joi.string().allow('').optional(),
       branch: Joi.string().allow('').optional(),
     }).optional(),
+    contractorSettings: contractorSettingsSchema,
   }),
 };
 
@@ -58,6 +72,7 @@ export const updatePartySchema = {
       ifsc: Joi.string().allow('').optional(),
       branch: Joi.string().allow('').optional(),
     }).optional(),
+    contractorSettings: contractorSettingsSchema,
     isActive: Joi.boolean().optional(),
   }).min(1),
 };
@@ -66,5 +81,14 @@ export const listPartySchema = {
   query: Joi.object({
     type: Joi.string().valid(...partyTypeValues).optional(),
     search: Joi.string().optional(),
+  }),
+};
+
+export const getPartyLedgerSchema = {
+  params: Joi.object({ id: Joi.string().required() }),
+  query: Joi.object({
+    financialYear: Joi.string().pattern(/^\d{4}-\d{2}$/).optional(),
+    fromDate: Joi.date().iso().optional(),
+    toDate: Joi.date().iso().optional(),
   }),
 };

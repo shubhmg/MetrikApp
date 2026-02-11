@@ -1,4 +1,6 @@
 import ApiError from '../utils/ApiError.js';
+import { ROLES } from '../config/constants.js';
+import { getDefaultPermissions } from '../config/permissions.js';
 
 /**
  * Extracts businessId from x-business-id header and validates
@@ -19,9 +21,15 @@ export default function tenantContext(req, _res, next) {
     return next(ApiError.forbidden('No access to this business'));
   }
 
+  let effectivePermissions = membership.permissions || [];
+  if (membership.role === ROLES.CONTRACTOR) {
+    const contractorDefaults = getDefaultPermissions(ROLES.CONTRACTOR);
+    effectivePermissions = [...new Set([...(effectivePermissions || []), ...contractorDefaults])];
+  }
+
   req.businessId = businessId;
   req.businessRole = membership.role;
-  req.businessPermissions = membership.permissions;
+  req.businessPermissions = effectivePermissions;
   req.allowedMaterialCentreIds = membership.allowedMaterialCentreIds || [];
   next();
 }

@@ -1,9 +1,20 @@
 import mongoose from 'mongoose';
 import Item from './item.model.js';
 import ItemGroup from './itemGroup.model.js';
+import Unit from './unit.model.js';
 import BillOfMaterial from '../bom/bom.model.js';
 import InventoryLedger from '../voucher/inventoryLedger.model.js';
 import ApiError from '../../utils/ApiError.js';
+
+const DEFAULT_UNITS = [
+  { name: 'Pieces', symbol: 'pcs' },
+  { name: 'Kilogram', symbol: 'kg' },
+  { name: 'Gram', symbol: 'g' },
+  { name: 'Litre', symbol: 'ltr' },
+  { name: 'Millilitre', symbol: 'ml' },
+  { name: 'Meter', symbol: 'm' },
+  { name: 'Dozen', symbol: 'dozen' },
+];
 
 // ─── ItemGroup ───
 
@@ -51,7 +62,16 @@ export async function createItem(data, businessId, userId) {
   const group = await ItemGroup.findOne({ _id: data.itemGroupId, businessId });
   if (!group) throw ApiError.badRequest('Invalid item group');
 
-  return Item.create({ ...data, businessId, createdBy: userId, updatedBy: userId });
+  const unit = await Unit.findOne({ _id: data.unitId, businessId });
+  if (!unit) throw ApiError.badRequest('Invalid unit');
+
+  return Item.create({
+    ...data,
+    unit: unit.symbol,
+    businessId,
+    createdBy: userId,
+    updatedBy: userId,
+  });
 }
 
 export async function listItems(businessId, filters = {}) {
@@ -64,11 +84,16 @@ export async function listItems(businessId, filters = {}) {
     ];
   }
 
-  return Item.find(query).populate('itemGroupId', 'name code type').sort({ name: 1 });
+  return Item.find(query)
+    .populate('itemGroupId', 'name code type')
+    .populate('unitId', 'name symbol')
+    .sort({ name: 1 });
 }
 
 export async function getItemById(id, businessId) {
-  const item = await Item.findOne({ _id: id, businessId }).populate('itemGroupId', 'name code type');
+  const item = await Item.findOne({ _id: id, businessId })
+    .populate('itemGroupId', 'name code type')
+    .populate('unitId', 'name symbol');
   if (!item) throw ApiError.notFound('Item not found');
   return item;
 }
@@ -76,6 +101,12 @@ export async function getItemById(id, businessId) {
 export async function updateItem(id, data, businessId, userId) {
   const item = await Item.findOne({ _id: id, businessId });
   if (!item) throw ApiError.notFound('Item not found');
+
+  if (data.unitId) {
+    const unit = await Unit.findOne({ _id: data.unitId, businessId });
+    if (!unit) throw ApiError.badRequest('Invalid unit');
+    data.unit = unit.symbol;
+  }
 
   Object.assign(item, data, { updatedBy: userId });
   return item.save();
@@ -96,6 +127,49 @@ export async function deleteItem(id, businessId, userId) {
   }
 
   return item.softDelete(userId);
+}
+
+// ─── Unit ───
+
+async function ensureDefaultUnits(businessId, userId) {
+  const count = await Unit.countDocuments({ businessId });
+  if (count > 0) return;
+  await Unit.insertMany(
+    DEFAULT_UNITS.map((u) => ({
+      ...u,
+      businessId,
+      createdBy: userId,
+      updatedBy: userId,
+    }))
+  );
+}
+
+export async function listUnits(businessId, userId) {
+  await ensureDefaultUnits(businessId, userId);
+  return Unit.find({ businessId }).sort({ name: 1 });
+}
+
+export async function createUnit(data, businessId, userId) {
+  const exists = await Unit.findOne({ businessId, symbol: data.symbol });
+  if (exists) throw ApiError.conflict(`Unit symbol "${data.symbol}" already exists`);
+  return Unit.create({ ...data, businessId, createdBy: userId, updatedBy: userId });
+}
+
+export async function updateUnit(id, data, businessId, userId) {
+  const unit = await Unit.findOne({ _id: id, businessId });
+  if (!unit) throw ApiError.notFound('Unit not found');
+  Object.assign(unit, data, { updatedBy: userId });
+  return unit.save();
+}
+
+export async function deleteUnit(id, businessId, userId) {
+  const used = await Item.countDocuments({ businessId, unitId: id });
+  if (used > 0) {
+    throw ApiError.badRequest('Cannot delete unit linked to items');
+  }
+  const unit = await Unit.findOne({ _id: id, businessId });
+  if (!unit) throw ApiError.notFound('Unit not found');
+  return unit.softDelete(userId);
 }
 
 // ─── Item Ledger ───

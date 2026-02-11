@@ -47,6 +47,7 @@ export const ROLES = {
   MANAGER: 'manager',
   ACCOUNTANT: 'accountant',
   OPERATOR: 'operator',
+  CONTRACTOR: 'contractor',
   VIEWER: 'viewer',
 };
 

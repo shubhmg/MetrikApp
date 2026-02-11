@@ -1,7 +1,9 @@
 import Party from './party.model.js';
 import Account from '../account/account.model.js';
+import { getAccountLedger } from '../account/account.service.js';
+import User from '../auth/user.model.js';
 import ApiError from '../../utils/ApiError.js';
-import { PARTY_TYPES } from '../../config/constants.js';
+import { PARTY_TYPES, ROLES } from '../../config/constants.js';
 
 /**
  * Determines the account type for a party's linked account.
@@ -20,6 +22,17 @@ function getLinkedAccountGroup(partyTypes) {
 }
 
 export async function createParty(data, businessId, userId) {
+  if (data.contractorSettings && !data.type?.includes(PARTY_TYPES.CONTRACTOR)) {
+    throw ApiError.badRequest('Contractor settings can be set only for contractor party type');
+  }
+  if (data.contractorSettings?.linkedUserId) {
+    const linked = await User.findOne({
+      _id: data.contractorSettings.linkedUserId,
+      businesses: { $elemMatch: { businessId, isActive: true } },
+    }).select('_id');
+    if (!linked) throw ApiError.badRequest('Linked contractor user must be an active member of this business');
+  }
+
   // Create linked account for this party
   const accountType = getLinkedAccountType(data.type);
   const accountGroup = getLinkedAccountGroup(data.type);
@@ -67,14 +80,48 @@ export async function listParties(businessId, filters = {}) {
 }
 
 export async function getPartyById(id, businessId) {
-  const party = await Party.findOne({ _id: id, businessId }).populate('linkedAccountId', 'name code type');
+  const party = await Party.findOne({ _id: id, businessId })
+    .populate('linkedAccountId', 'name code type')
+    .populate('contractorSettings.consumeMaterialCentreId', 'name code')
+    .populate('contractorSettings.outputMaterialCentreId', 'name code')
+    .populate('contractorSettings.linkedUserId', 'name email')
+    .populate('contractorSettings.itemRates.itemId', 'name sku unit');
   if (!party) throw ApiError.notFound('Party not found');
   return party;
+}
+
+export async function getPartyLedger(partyId, businessId, filters = {}, actor = {}) {
+  const party = await Party.findOne({ _id: partyId, businessId }).select('linkedAccountId contractorSettings.linkedUserId');
+  if (!party) throw ApiError.notFound('Party not found');
+
+  if (actor.role === ROLES.CONTRACTOR) {
+    const linkedUserId = party.contractorSettings?.linkedUserId;
+    if (String(linkedUserId) !== String(actor.userId)) {
+      throw ApiError.forbidden('Insufficient permissions');
+    }
+  }
+
+  if (!party.linkedAccountId) {
+    throw ApiError.badRequest('Linked account not found for this party');
+  }
+
+  return getAccountLedger(party.linkedAccountId, businessId, filters);
 }
 
 export async function updateParty(id, data, businessId, userId) {
   const party = await Party.findOne({ _id: id, businessId });
   if (!party) throw ApiError.notFound('Party not found');
+
+  if (data.contractorSettings && !(data.type || party.type || []).includes(PARTY_TYPES.CONTRACTOR)) {
+    throw ApiError.badRequest('Contractor settings can be set only for contractor party type');
+  }
+  if (data.contractorSettings?.linkedUserId) {
+    const linked = await User.findOne({
+      _id: data.contractorSettings.linkedUserId,
+      businesses: { $elemMatch: { businessId, isActive: true } },
+    }).select('_id');
+    if (!linked) throw ApiError.badRequest('Linked contractor user must be an active member of this business');
+  }
 
   // If name changed, update linked account name too
   if (data.name && data.name !== party.name && party.linkedAccountId) {

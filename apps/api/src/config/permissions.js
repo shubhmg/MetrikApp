@@ -96,6 +96,15 @@ export const ROLE_PRESETS = {
     ),
     ...OPERATOR_READ_MODULES.map((m) => `${m}:read`),
   ],
+  contractor: [
+    'dashboard:read',
+    'production:read',
+    'production:write',
+    'production:delete',
+    'item:read',
+    'bom:read',
+    'party:read',
+  ],
   viewer: allPermsFor(['read']),
 };
 
