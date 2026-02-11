@@ -98,3 +98,42 @@ export function requireVoucherPermission(action) {
     }
   };
 }
+
+/**
+ * Require at least one voucher permission for a given action.
+ * Used for listing vouchers when no specific type is provided.
+ */
+export function requireAnyVoucherPermission(action) {
+  return (req, _res, next) => {
+    // Owner and admin bypass
+    if (req.businessRole === ROLES.OWNER || req.businessRole === ROLES.ADMIN) {
+      return next();
+    }
+
+    const perms = req.businessPermissions || [];
+    const hasAny = perms.some((p) => p.endsWith(`:${action}`));
+    if (!hasAny) {
+      return next(ApiError.forbidden('Insufficient permissions'));
+    }
+    next();
+  };
+}
+
+/**
+ * Require at least one permission for any of the given modules (any action).
+ * Useful for shared lookup endpoints (reference data).
+ */
+export function requireAnyModulePermission(modules = []) {
+  return (req, _res, next) => {
+    if (req.businessRole === ROLES.OWNER || req.businessRole === ROLES.ADMIN) {
+      return next();
+    }
+
+    const perms = req.businessPermissions || [];
+    const hasAny = perms.some((p) => modules.some((m) => p.startsWith(`${m}:`)));
+    if (!hasAny) {
+      return next(ApiError.forbidden('Insufficient permissions'));
+    }
+    next();
+  };
+}

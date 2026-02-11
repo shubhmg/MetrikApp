@@ -56,6 +56,9 @@ export const remove = catchAsync(async (req, res) => {
 });
 
 export const getLedger = catchAsync(async (req, res) => {
-  const ledger = await itemService.getItemLedger(req.params.id, req.businessId, req.query);
+  const ledger = await itemService.getItemLedger(req.params.id, req.businessId, {
+    ...req.query,
+    allowedMaterialCentreIds: req.allowedMaterialCentreIds,
+  });
   res.json({ success: true, data: ledger });
 });

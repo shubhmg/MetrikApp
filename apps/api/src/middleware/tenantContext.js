@@ -22,5 +22,6 @@ export default function tenantContext(req, _res, next) {
   req.businessId = businessId;
   req.businessRole = membership.role;
   req.businessPermissions = membership.permissions;
+  req.allowedMaterialCentreIds = membership.allowedMaterialCentreIds || [];
   next();
 }

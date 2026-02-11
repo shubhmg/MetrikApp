@@ -10,6 +10,7 @@ export const createMemberSchema = {
     phone: Joi.string().max(20).allow('').optional(),
     role: Joi.string().valid(...ROLE_VALUES).required(),
     permissions: Joi.array().items(Joi.string().valid(...ALL_PERMISSIONS)).optional(),
+    allowedMaterialCentreIds: Joi.array().items(Joi.string()).optional(),
   }),
 };
 
@@ -19,6 +20,7 @@ export const updateMemberSchema = {
     role: Joi.string().valid(...ROLE_VALUES).optional(),
     permissions: Joi.array().items(Joi.string().valid(...ALL_PERMISSIONS)).optional(),
     isActive: Joi.boolean().optional(),
+    allowedMaterialCentreIds: Joi.array().items(Joi.string()).optional(),
   }).min(1),
 };
 

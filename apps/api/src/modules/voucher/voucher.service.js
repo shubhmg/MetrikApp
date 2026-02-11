@@ -2,15 +2,37 @@ import Voucher from './voucher.model.js';
 import StockSummary from './stockSummary.model.js';
 import * as voucherEngine from '../../engines/voucher.engine.js';
 import ApiError from '../../utils/ApiError.js';
+import { ROLES } from '../../config/constants.js';
+import { VOUCHER_TYPE_MODULE_MAP } from '../../config/permissions.js';
 
 export async function createVoucher(data, businessId, userId) {
   return voucherEngine.create(data, businessId, userId);
 }
 
-export async function listVouchers(businessId, filters = {}) {
+function getAllowedVoucherTypes(role, permissions = []) {
+  if (role === ROLES.OWNER || role === ROLES.ADMIN) return null;
+  const allowed = [];
+  for (const [type, module] of Object.entries(VOUCHER_TYPE_MODULE_MAP)) {
+    const canRead = permissions.includes(`${module}:read`);
+    const canWrite = permissions.includes(`${module}:write`);
+    const canDelete = permissions.includes(`${module}:delete`);
+    if (canRead || canWrite || canDelete) allowed.push(type);
+  }
+  return allowed;
+}
+
+export async function listVouchers(businessId, filters = {}, access = {}) {
   const query = { businessId };
 
-  if (filters.voucherType) query.voucherType = filters.voucherType;
+  const allowedTypes = getAllowedVoucherTypes(access.role, access.permissions || []);
+  if (filters.voucherType) {
+    if (allowedTypes && !allowedTypes.includes(filters.voucherType)) {
+      throw ApiError.forbidden('Insufficient permissions');
+    }
+    query.voucherType = filters.voucherType;
+  } else if (allowedTypes) {
+    query.voucherType = { $in: allowedTypes };
+  }
   if (filters.status) query.status = filters.status;
   if (filters.partyId) query.partyId = filters.partyId;
   if (filters.materialCentreId) query.materialCentreId = filters.materialCentreId;
@@ -35,6 +57,7 @@ export async function listVouchers(businessId, filters = {}) {
       .populate('materialCentreId', 'name code')
       .populate('lineItems.itemId', 'name sku unit')
       .populate('bomId', 'name version')
+      .populate('createdBy', 'name')
       .sort({ date: -1, createdAt: -1 })
       .skip(skip)
       .limit(limit),
@@ -68,10 +91,20 @@ export async function cancelVoucher(id, businessId, userId, reason, req) {
   return voucherEngine.cancel(id, businessId, userId, reason, req);
 }
 
-export async function getStockSummary(businessId, filters = {}) {
+export async function getStockSummary(businessId, filters = {}, allowedMaterialCentreIds = []) {
   const query = { businessId };
   if (filters.materialCentreId) query.materialCentreId = filters.materialCentreId;
   if (filters.itemId) query.itemId = filters.itemId;
+
+  if (allowedMaterialCentreIds && allowedMaterialCentreIds.length > 0) {
+    const allowedSet = new Set(allowedMaterialCentreIds.map((id) => String(id)));
+    if (filters.materialCentreId && !allowedSet.has(String(filters.materialCentreId))) {
+      throw ApiError.forbidden('Insufficient permissions');
+    }
+    if (!filters.materialCentreId) {
+      query.materialCentreId = { $in: allowedMaterialCentreIds };
+    }
+  }
 
   const populateOptions = {
     path: 'itemId',

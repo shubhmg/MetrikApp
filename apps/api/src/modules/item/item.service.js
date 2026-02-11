@@ -115,6 +115,9 @@ export async function getItemLedger(itemId, businessId, filters = {}) {
   const mcObjectId = filters.materialCentreId
     ? (typeof filters.materialCentreId === 'string' ? new mongoose.Types.ObjectId(filters.materialCentreId) : filters.materialCentreId)
     : null;
+  const allowedMcIds = (filters.allowedMaterialCentreIds || []).map((id) =>
+    typeof id === 'string' ? new mongoose.Types.ObjectId(id) : id
+  );
 
   const item = await Item.findOne({ _id: itemObjectId, businessId: businessObjectId }).populate('itemGroupId', 'name code type');
   if (!item) throw ApiError.notFound('Item not found');
@@ -124,7 +127,12 @@ export async function getItemLedger(itemId, businessId, filters = {}) {
     itemId: itemObjectId,
   };
 
-  if (mcObjectId) {
+  if (allowedMcIds.length > 0) {
+    if (mcObjectId && !allowedMcIds.some((id) => id.toString() === mcObjectId.toString())) {
+      throw ApiError.forbidden('Insufficient permissions');
+    }
+    query.materialCentreId = mcObjectId ? mcObjectId : { $in: allowedMcIds };
+  } else if (mcObjectId) {
     query.materialCentreId = mcObjectId;
   }
 
@@ -155,7 +163,9 @@ export async function getItemLedger(itemId, businessId, filters = {}) {
   };
   let hasPreQuery = false;
 
-  if (mcObjectId) {
+  if (allowedMcIds.length > 0) {
+    preQuery.materialCentreId = mcObjectId ? mcObjectId : { $in: allowedMcIds };
+  } else if (mcObjectId) {
     preQuery.materialCentreId = mcObjectId;
   }
 

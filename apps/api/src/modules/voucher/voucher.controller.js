@@ -7,7 +7,10 @@ export const create = catchAsync(async (req, res) => {
 });
 
 export const list = catchAsync(async (req, res) => {
-  const result = await voucherService.listVouchers(req.businessId, req.query);
+  const result = await voucherService.listVouchers(req.businessId, req.query, {
+    role: req.businessRole,
+    permissions: req.businessPermissions,
+  });
   res.json({ success: true, data: result });
 });
 
@@ -49,6 +52,6 @@ export const remove = catchAsync(async (req, res) => {
 });
 
 export const getStockSummary = catchAsync(async (req, res) => {
-  const stock = await voucherService.getStockSummary(req.businessId, req.query);
+  const stock = await voucherService.getStockSummary(req.businessId, req.query, req.allowedMaterialCentreIds);
   res.json({ success: true, data: { stock } });
 });

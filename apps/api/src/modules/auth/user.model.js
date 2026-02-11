@@ -19,6 +19,7 @@ const userSchema = new mongoose.Schema(
         businessId: { type: mongoose.Schema.Types.ObjectId, ref: 'Business', required: true },
         role: { type: String, enum: ROLE_VALUES, required: true },
         permissions: [{ type: String }],
+        allowedMaterialCentreIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'MaterialCentre' }],
         isActive: { type: Boolean, default: true },
       },
     ],

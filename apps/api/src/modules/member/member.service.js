@@ -19,6 +19,7 @@ export async function listMembers(businessId) {
       phone: u.phone,
       role: membership.role,
       permissions: membership.permissions,
+      allowedMaterialCentreIds: membership.allowedMaterialCentreIds || [],
       isActive: membership.isActive,
     };
   });
@@ -40,12 +41,13 @@ export async function getMember(userId, businessId) {
     phone: user.phone,
     role: membership.role,
     permissions: membership.permissions,
+    allowedMaterialCentreIds: membership.allowedMaterialCentreIds || [],
     isActive: membership.isActive,
   };
 }
 
 export async function createMember(data, businessId, requestingUserId) {
-  const { email, name, password, phone, role, permissions } = data;
+  const { email, name, password, phone, role, permissions, allowedMaterialCentreIds } = data;
 
   // Cannot add a second owner
   if (role === ROLES.OWNER) {
@@ -79,6 +81,7 @@ export async function createMember(data, businessId, requestingUserId) {
       businessId,
       role,
       permissions: effectivePermissions,
+      allowedMaterialCentreIds: allowedMaterialCentreIds || [],
       isActive: true,
     });
     await user.save();
@@ -94,6 +97,7 @@ export async function createMember(data, businessId, requestingUserId) {
           businessId,
           role,
           permissions: effectivePermissions,
+          allowedMaterialCentreIds: allowedMaterialCentreIds || [],
           isActive: true,
         },
       ],
@@ -111,12 +115,13 @@ export async function createMember(data, businessId, requestingUserId) {
     phone: user.phone,
     role: membership.role,
     permissions: membership.permissions,
+    allowedMaterialCentreIds: membership.allowedMaterialCentreIds || [],
     isActive: membership.isActive,
   };
 }
 
 export async function updateMember(userId, data, businessId, requestingUserId) {
-  const { role, permissions, isActive } = data;
+  const { role, permissions, isActive, allowedMaterialCentreIds } = data;
 
   // Cannot edit own membership
   if (userId === requestingUserId) {
@@ -143,6 +148,7 @@ export async function updateMember(userId, data, businessId, requestingUserId) {
 
   if (role !== undefined) membership.role = role;
   if (permissions !== undefined) membership.permissions = permissions;
+  if (allowedMaterialCentreIds !== undefined) membership.allowedMaterialCentreIds = allowedMaterialCentreIds;
   if (isActive !== undefined) membership.isActive = isActive;
 
   await user.save();
@@ -154,6 +160,7 @@ export async function updateMember(userId, data, businessId, requestingUserId) {
     phone: user.phone,
     role: membership.role,
     permissions: membership.permissions,
+    allowedMaterialCentreIds: membership.allowedMaterialCentreIds || [],
     isActive: membership.isActive,
   };
 }
