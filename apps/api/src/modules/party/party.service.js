@@ -114,7 +114,9 @@ export async function updateParty(id, data, businessId, userId) {
   if (!party) throw ApiError.notFound('Party not found');
 
   // Check if contractor settings are being enabled for a non-contractor party
-  if (data.contractorSettings?.isEnabled && !(data.type || party.type || []).includes(PARTY_TYPES.CONTRACTOR)) {
+  // Use data.type if provided (array), otherwise fall back to existing party.type
+  const typeToCheck = data.type !== undefined ? data.type : party.type;
+  if (data.contractorSettings?.isEnabled && !typeToCheck?.includes(PARTY_TYPES.CONTRACTOR)) {
     throw ApiError.badRequest('Contractor settings can be set only for contractor party type');
   }
   if (data.contractorSettings?.linkedUserId) {
