@@ -3,6 +3,7 @@ import User from '../auth/user.model.js';
 import ApiError from '../../utils/ApiError.js';
 import { ROLES } from '../../config/constants.js';
 import { seedChartOfAccounts } from '../account/account.seed.js';
+import { ALL_PERMISSIONS } from '../../config/permissions.js';
 
 export async function createBusiness(data, userId) {
   const business = await Business.create({
@@ -17,7 +18,7 @@ export async function createBusiness(data, userId) {
       businesses: {
         businessId: business._id,
         role: ROLES.OWNER,
-        permissions: [],
+        permissions: ALL_PERMISSIONS,
         isActive: true,
       },
     },

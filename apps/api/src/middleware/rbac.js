@@ -1,5 +1,7 @@
 import ApiError from '../utils/ApiError.js';
 import { ROLES } from '../config/constants.js';
+import { VOUCHER_TYPE_MODULE_MAP } from '../config/permissions.js';
+import Voucher from '../modules/voucher/voucher.model.js';
 
 const ROLE_HIERARCHY = {
   [ROLES.OWNER]: 6,
@@ -42,5 +44,57 @@ export function requirePermission(permission) {
       return next(ApiError.forbidden('Insufficient permissions'));
     }
     next();
+  };
+}
+
+/**
+ * Checks voucher-type-specific permission.
+ * For POST (create): reads voucherType from req.body.
+ * For PUT/DELETE/cancel on existing voucher: loads voucher from DB.
+ * Usage: requireVoucherPermission('write') or requireVoucherPermission('delete')
+ */
+export function requireVoucherPermission(action) {
+  return async (req, _res, next) => {
+    // Owner and admin bypass
+    if (req.businessRole === ROLES.OWNER || req.businessRole === ROLES.ADMIN) {
+      return next();
+    }
+
+    try {
+      let voucherType;
+
+      if (req.method === 'POST' && !req.params.id) {
+        // Creating a new voucher — type is in the body
+        voucherType = req.body.voucherType;
+      } else if (req.params.id) {
+        // Operating on an existing voucher — load it to get the type
+        const voucher = await Voucher.findById(req.params.id).select('voucherType businessId').lean();
+        if (!voucher) {
+          return next(ApiError.notFound('Voucher not found'));
+        }
+        if (voucher.businessId.toString() !== req.businessId) {
+          return next(ApiError.forbidden('No access to this voucher'));
+        }
+        voucherType = voucher.voucherType;
+      }
+
+      if (!voucherType) {
+        return next(ApiError.badRequest('Voucher type is required'));
+      }
+
+      const module = VOUCHER_TYPE_MODULE_MAP[voucherType];
+      if (!module) {
+        return next(ApiError.badRequest(`Unknown voucher type: ${voucherType}`));
+      }
+
+      const permission = `${module}:${action}`;
+      if (!req.businessPermissions || !req.businessPermissions.includes(permission)) {
+        return next(ApiError.forbidden('Insufficient permissions'));
+      }
+
+      next();
+    } catch (err) {
+      next(err);
+    }
   };
 }
