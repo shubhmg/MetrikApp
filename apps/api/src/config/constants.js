@@ -81,11 +81,6 @@ export const PARTY_TYPES = {
   CONTRACTOR: 'contractor',
 };
 
-export const COSTING_METHODS = {
-  WEIGHTED_AVERAGE: 'weighted_average',
-  FIFO: 'fifo',
-};
-
 export const BOM_STATUS = {
   DRAFT: 'draft',
   ACTIVE: 'active',

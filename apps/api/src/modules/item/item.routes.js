@@ -7,6 +7,7 @@ import {
   createItemSchema,
   updateItemSchema,
   listItemSchema,
+  getItemLedgerSchema,
 } from './item.validation.js';
 
 const router = Router();
@@ -22,6 +23,7 @@ router.delete('/groups/:id', itemController.deleteGroup);
 router.post('/', validate(createItemSchema), itemController.create);
 router.get('/', validate(listItemSchema), itemController.list);
 router.get('/:id', itemController.getById);
+router.get('/:id/ledger', validate(getItemLedgerSchema), itemController.getLedger);
 router.patch('/:id', validate(updateItemSchema), itemController.update);
 router.delete('/:id', itemController.remove);
 

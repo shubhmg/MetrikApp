@@ -2,8 +2,6 @@ import mongoose from 'mongoose';
 import tenantScope from '../../plugins/tenantScope.js';
 import softDelete from '../../plugins/softDelete.js';
 import auditFields from '../../plugins/auditFields.js';
-import { COSTING_METHODS } from '../../config/constants.js';
-
 const itemSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   sku: { type: String, required: true, trim: true },
@@ -11,11 +9,7 @@ const itemSchema = new mongoose.Schema({
   unit: { type: String, required: true, trim: true }, // kg, pcs, mtr, ltr, etc.
   hsnCode: { type: String, trim: true },
   gstRate: { type: Number, default: 0 }, // percentage e.g. 18
-  costingMethod: {
-    type: String,
-    enum: Object.values(COSTING_METHODS),
-    default: COSTING_METHODS.WEIGHTED_AVERAGE,
-  },
+  salesPrice: { type: Number, default: 0 }, // default selling price
   reorderLevel: { type: Number, default: 0 },
   description: { type: String, trim: true },
   isActive: { type: Boolean, default: true },

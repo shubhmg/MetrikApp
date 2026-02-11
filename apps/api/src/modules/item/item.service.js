@@ -1,6 +1,8 @@
+import mongoose from 'mongoose';
 import Item from './item.model.js';
 import ItemGroup from './itemGroup.model.js';
 import BillOfMaterial from '../bom/bom.model.js';
+import InventoryLedger from '../voucher/inventoryLedger.model.js';
 import ApiError from '../../utils/ApiError.js';
 
 // ─── ItemGroup ───
@@ -94,4 +96,106 @@ export async function deleteItem(id, businessId, userId) {
   }
 
   return item.softDelete(userId);
+}
+
+// ─── Item Ledger ───
+
+function parseFinancialYearRange(financialYear) {
+  const parts = String(financialYear || '').split('-');
+  const startYear = parseInt(parts[0], 10);
+  if (Number.isNaN(startYear)) return null;
+  const start = new Date(startYear, 3, 1);
+  const end = new Date(startYear + 1, 2, 31, 23, 59, 59, 999);
+  return { start, end };
+}
+
+export async function getItemLedger(itemId, businessId, filters = {}) {
+  const businessObjectId = typeof businessId === 'string' ? new mongoose.Types.ObjectId(businessId) : businessId;
+  const itemObjectId = typeof itemId === 'string' ? new mongoose.Types.ObjectId(itemId) : itemId;
+  const mcObjectId = filters.materialCentreId
+    ? (typeof filters.materialCentreId === 'string' ? new mongoose.Types.ObjectId(filters.materialCentreId) : filters.materialCentreId)
+    : null;
+
+  const item = await Item.findOne({ _id: itemObjectId, businessId: businessObjectId }).populate('itemGroupId', 'name code type');
+  if (!item) throw ApiError.notFound('Item not found');
+
+  const query = {
+    businessId: businessObjectId,
+    itemId: itemObjectId,
+  };
+
+  if (mcObjectId) {
+    query.materialCentreId = mcObjectId;
+  }
+
+  if (filters.fromDate || filters.toDate) {
+    query.date = {};
+    if (filters.fromDate) query.date.$gte = new Date(filters.fromDate);
+    if (filters.toDate) {
+      const end = new Date(filters.toDate);
+      end.setUTCHours(23, 59, 59, 999);
+      query.date.$lte = end;
+    }
+  } else if (filters.financialYear) {
+    const range = parseFinancialYearRange(filters.financialYear);
+    if (range) {
+      query.date = { $gte: range.start, $lte: range.end };
+    }
+  }
+
+  const entries = await InventoryLedger.find(query)
+    .populate('materialCentreId', 'name code')
+    .sort({ date: 1, createdAt: 1 })
+    .lean();
+
+  // Opening balance (qty/value) before the filter window
+  const preQuery = {
+    businessId: businessObjectId,
+    itemId: itemObjectId,
+  };
+  let hasPreQuery = false;
+
+  if (mcObjectId) {
+    preQuery.materialCentreId = mcObjectId;
+  }
+
+  if (filters.fromDate) {
+    preQuery.date = { $lt: new Date(filters.fromDate) };
+    hasPreQuery = true;
+  } else if (filters.financialYear) {
+    const range = parseFinancialYearRange(filters.financialYear);
+    if (range) {
+      preQuery.date = { $lt: range.start };
+      hasPreQuery = true;
+    }
+  }
+
+  let openingQuantity = 0;
+  let openingValue = 0;
+  if (hasPreQuery) {
+    const result = await InventoryLedger.aggregate([
+      { $match: preQuery },
+      {
+        $group: {
+          _id: null,
+          inQty: { $sum: { $cond: [{ $eq: ['$type', 'in'] }, '$quantity', 0] } },
+          outQty: { $sum: { $cond: [{ $eq: ['$type', 'out'] }, '$quantity', 0] } },
+          inValue: { $sum: { $cond: [{ $eq: ['$type', 'in'] }, '$value', 0] } },
+          outValue: { $sum: { $cond: [{ $eq: ['$type', 'out'] }, '$value', 0] } },
+        },
+      },
+    ]);
+
+    if (result.length > 0) {
+      openingQuantity = (result[0].inQty || 0) - (result[0].outQty || 0);
+      openingValue = (result[0].inValue || 0) - (result[0].outValue || 0);
+    }
+  }
+
+  return {
+    item,
+    openingQuantity,
+    openingValue,
+    entries,
+  };
 }

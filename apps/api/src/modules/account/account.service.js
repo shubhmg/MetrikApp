@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import Account from './account.model.js';
 import JournalEntry from '../voucher/journalEntry.model.js';
 import ApiError from '../../utils/ApiError.js';
@@ -61,12 +62,15 @@ export async function deleteAccount(id, businessId, userId) {
 }
 
 export async function getAccountLedger(accountId, businessId, filters = {}) {
-  const account = await Account.findOne({ _id: accountId, businessId });
+  const businessObjectId = typeof businessId === 'string' ? new mongoose.Types.ObjectId(businessId) : businessId;
+  const accountObjectId = typeof accountId === 'string' ? new mongoose.Types.ObjectId(accountId) : accountId;
+
+  const account = await Account.findOne({ _id: accountObjectId, businessId: businessObjectId });
   if (!account) throw ApiError.notFound('Account not found');
 
   const query = {
-    businessId,
-    accountId,
+    businessId: businessObjectId,
+    accountId: accountObjectId,
   };
 
   if (filters.financialYear) {
@@ -90,8 +94,8 @@ export async function getAccountLedger(accountId, businessId, filters = {}) {
 
   // If filtering, add previous transactions to opening balance
   const preQuery = {
-    businessId,
-    accountId,
+    businessId: businessObjectId,
+    accountId: accountObjectId,
   };
   let hasPreQuery = false;
 
@@ -99,7 +103,14 @@ export async function getAccountLedger(accountId, businessId, filters = {}) {
     preQuery.date = { $lt: new Date(filters.fromDate) };
     hasPreQuery = true;
   } else if (filters.financialYear) {
-    preQuery.financialYear = { $lt: filters.financialYear };
+    // Use both FY string and date boundary to be resilient to bad data
+    const parts = String(filters.financialYear).split('-');
+    const startYear = parseInt(parts[0], 10);
+    const fyCutoff = !Number.isNaN(startYear) ? new Date(startYear, 3, 1) : null; // April 1
+    preQuery.$or = [
+      { financialYear: { $lt: filters.financialYear } },
+      ...(fyCutoff ? [{ date: { $lt: fyCutoff } }] : []),
+    ];
     hasPreQuery = true;
   }
 

@@ -54,3 +54,8 @@ export const remove = catchAsync(async (req, res) => {
   await itemService.deleteItem(req.params.id, req.businessId, req.user._id);
   res.json({ success: true, message: 'Item deleted' });
 });
+
+export const getLedger = catchAsync(async (req, res) => {
+  const ledger = await itemService.getItemLedger(req.params.id, req.businessId, req.query);
+  res.json({ success: true, data: ledger });
+});

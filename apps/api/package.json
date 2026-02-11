@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "node --watch src/server.js",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "seed:demo": "node src/scripts/seedDemo.js"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",
