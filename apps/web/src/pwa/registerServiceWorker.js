@@ -40,12 +40,13 @@ export function initNativeAppFeatures() {
     });
   }
 
-  // Enhance status bar color dynamically
+  // Enhance status bar color dynamically to match toolbar
   function updateStatusBarColor() {
     const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     const metaThemeColor = document.querySelector('meta[name="theme-color"]');
     if (metaThemeColor) {
-      metaThemeColor.setAttribute('content', '#12b886');
+      // Match toolbar background: white in light mode, dark surface in dark mode
+      metaThemeColor.setAttribute('content', isDark ? '#1e1e1e' : '#ffffff');
     }
   }
 

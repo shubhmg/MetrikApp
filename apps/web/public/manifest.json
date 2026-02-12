@@ -8,7 +8,7 @@
   "display_override": ["window-controls-overlay", "standalone", "minimal-ui", "browser"],
   "orientation": "portrait-primary",
   "background_color": "#ffffff",
-  "theme_color": "#12b886",
+  "theme_color": "#ffffff",
   "prefer_related_applications": false,
   "categories": ["business", "productivity"],
   "shortcuts": [
