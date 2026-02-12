@@ -98,6 +98,9 @@ export default function Members() {
   const [editPermissions, setEditPermissions] = useState([]);
   const [editActive, setEditActive] = useState(true);
   const [editAllowedMcs, setEditAllowedMcs] = useState([]);
+  const [createRoleSelectOpen, setCreateRoleSelectOpen] = useState(false);
+  const [editRoleSelectOpen, setEditRoleSelectOpen] = useState(false);
+  const [editMcSelectOpen, setEditMcSelectOpen] = useState(false);
 
   useEffect(() => { loadMembers(); }, [canReadMember]);
   useEffect(() => {
@@ -304,7 +307,12 @@ export default function Members() {
             <TextInput label="Name" required {...createForm.getInputProps('name')} />
             <PasswordInput label="Password" required minLength={6} {...createForm.getInputProps('password')} />
             <TextInput label="Phone" {...createForm.getInputProps('phone')} />
-            <Select label="Role" data={ROLE_OPTIONS} required {...createForm.getInputProps('role')} />
+            <Select label="Role" data={ROLE_OPTIONS} required {...createForm.getInputProps('role')} comboboxProps={{
+              withinPortal: true,
+              position: 'bottom-start',
+              onDropdownOpen: () => setCreateRoleSelectOpen(true),
+              onDropdownClose: () => setCreateRoleSelectOpen(false),
+            }} />
             <MultiSelect
               label="Inventory Scope (Material Centres)"
               placeholder="All material centres"
@@ -312,6 +320,12 @@ export default function Members() {
               clearable
               searchable
               {...createForm.getInputProps('allowedMaterialCentreIds')}
+              comboboxProps={{
+                withinPortal: true,
+                position: 'bottom-start',
+                onDropdownOpen: () => setEditMcSelectOpen(true),
+                onDropdownClose: () => setEditMcSelectOpen(false),
+              }}
             />
             <Text size="xs" c="dimmed">
               Leave empty to allow access to all material centres.
@@ -344,6 +358,12 @@ export default function Members() {
               data={ROLE_OPTIONS}
               value={editRole}
               onChange={setEditRole}
+              comboboxProps={{
+                withinPortal: true,
+                position: 'bottom-start',
+                onDropdownOpen: () => setEditRoleSelectOpen(true),
+                onDropdownClose: () => setEditRoleSelectOpen(false),
+              }}
             />
             <Switch
               label="Active"
@@ -361,6 +381,12 @@ export default function Members() {
             searchable
             value={editAllowedMcs}
             onChange={setEditAllowedMcs}
+            comboboxProps={{
+              withinPortal: true,
+              position: 'bottom-start',
+              onDropdownOpen: () => setEditMcSelectOpen(true),
+              onDropdownClose: () => setEditMcSelectOpen(false),
+            }}
           />
           <Text size="xs" c="dimmed">
             Leave empty to allow access to all material centres.

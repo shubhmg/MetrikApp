@@ -59,6 +59,7 @@ export default function Boms() {
   const [error, setError] = useState('');
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [outputItemSelectOpen, setOutputItemSelectOpen] = useState(false);
   const isMobile = useMediaQuery('(max-width: 48em)');
 
   // Version history modal
@@ -398,6 +399,12 @@ export default function Boms() {
               searchable
               disabled={!!editingId}
               {...form.getInputProps('outputItemId')}
+              comboboxProps={{
+                withinPortal: true,
+                position: 'bottom-start',
+                onDropdownOpen: () => setOutputItemSelectOpen(true),
+                onDropdownClose: () => setOutputItemSelectOpen(false),
+              }}
             />
             <TextInput label="BOM Name" required {...form.getInputProps('name')} />
             <Textarea label="Description" minRows={2} {...form.getInputProps('description')} />

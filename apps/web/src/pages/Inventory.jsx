@@ -59,6 +59,7 @@ export default function Inventory() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [physicalStockOpen, setPhysicalStockOpen] = useState(false);
+  const [mcTypeSelectOpen, setMcTypeSelectOpen] = useState(false);
   const isMobile = useMediaQuery('(max-width: 48em)');
 
   const mcForm = useForm({
@@ -287,7 +288,18 @@ export default function Inventory() {
           <Stack>
             <TextInput label="Name" required {...mcForm.getInputProps('name')} />
             <TextInput label="Code" required {...mcForm.getInputProps('code')} />
-            <Select label="Type" data={MC_TYPES} required {...mcForm.getInputProps('type')} />
+            <Select
+              label="Type"
+              data={MC_TYPES}
+              required
+              {...mcForm.getInputProps('type')}
+              comboboxProps={{
+                withinPortal: true,
+                position: 'bottom-start',
+                onDropdownOpen: () => setMcTypeSelectOpen(true),
+                onDropdownClose: () => setMcTypeSelectOpen(false),
+              }}
+            />
             <Switch label="Default Centre" {...mcForm.getInputProps('isDefault', { type: 'checkbox' })} />
             <Group justify="flex-end">
               <Button variant="default" onClick={() => setModalType(null)}>Cancel</Button>

@@ -1,11 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Center, Loader, Pagination, Select, Box, Stack, Group, Text, ActionIcon } from '@mantine/core';
+import { Center, Loader, Pagination, Select, Box, Stack, Group, Text, ActionIcon, Checkbox, Button, Alert } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
-import { IconTrash } from '@tabler/icons-react';
+import { IconTrash, IconFileInvoice } from '@tabler/icons-react';
 import PageHeader from '../components/PageHeader.jsx';
-import VoucherDetailModal from '../components/VoucherDetailModal.jsx';
 import ConfirmDelete from '../components/ConfirmDelete.jsx';
 import api from '../services/api.js';
 import { usePermission } from '../hooks/usePermission.js';
@@ -19,11 +18,7 @@ function fmtDateTime(d) {
   return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-function fmtCurrency(n) {
-  return (n || 0).toLocaleString('en-IN', { style: 'currency', currency: 'INR' });
-}
-
-function OrderCard({ voucher, onView, onDelete, canDelete }) {
+function OrderCard({ voucher, onView, onDelete, canDelete, isSelected, onSelect }) {
   const items = voucher.lineItems || [];
   const shownItems = items.slice(0, 3);
   const extraCount = items.length - shownItems.length;
@@ -38,7 +33,18 @@ function OrderCard({ voucher, onView, onDelete, canDelete }) {
       }}
       onClick={() => onView(voucher)}
     >
-      <Group justify="space-between" wrap="nowrap" align="center">
+      <Group justify="space-between" wrap="nowrap" align="flex-start">
+        <Checkbox
+          checked={isSelected}
+          onChange={(e) => {
+            e.stopPropagation();
+            onSelect(voucher._id);
+          }}
+          size="lg"
+          radius="xl"
+          style={{ marginTop: 2 }}
+          onClick={(e) => e.stopPropagation()}
+        />
         <Box style={{ flex: 1, minWidth: 0 }}>
           <Group justify="space-between" wrap="nowrap" align="center" mb={6}>
             <Group gap="xs" wrap="nowrap" style={{ minWidth: 0 }}>
@@ -97,7 +103,7 @@ function OrderCard({ voucher, onView, onDelete, canDelete }) {
   );
 }
 
-function OrderGroup({ date, vouchers, onView, onDelete, canDelete }) {
+function OrderGroup({ date, vouchers, onView, onDelete, canDelete, selectedIds, onSelect }) {
   return (
     <Box mb="md">
       <Text c="dimmed" size="xs" fw={700} mb="xs" tt="uppercase" style={{ letterSpacing: 0.5 }}>
@@ -105,7 +111,15 @@ function OrderGroup({ date, vouchers, onView, onDelete, canDelete }) {
       </Text>
       <Stack gap="sm">
         {vouchers.map((v) => (
-          <OrderCard key={v._id} voucher={v} onView={onView} onDelete={onDelete} canDelete={canDelete} />
+          <OrderCard
+            key={v._id}
+            voucher={v}
+            onView={onView}
+            onDelete={onDelete}
+            canDelete={canDelete}
+            isSelected={selectedIds.includes(v._id)}
+            onSelect={onSelect}
+          />
         ))}
       </Stack>
     </Box>
@@ -122,11 +136,12 @@ export default function SalesOrders() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState(null);
   const [mcFilter, setMcFilter] = useState(null);
   const [mcs, setMcs] = useState([]);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [convertingToInvoice, setConvertingToInvoice] = useState(false);
   const isMobile = useMediaQuery('(max-width: 48em)');
 
   useEffect(() => {
@@ -149,10 +164,41 @@ export default function SalesOrders() {
   }
 
   async function viewDetail(row) {
+    navigate(`/vouchers/${row._id}/edit`);
+  }
+
+  function toggleSelect(voucherId) {
+    setSelectedIds(prev =>
+      prev.includes(voucherId)
+        ? prev.filter(id => id !== voucherId)
+        : [...prev, voucherId]
+    );
+  }
+
+  async function handleConvertToInvoice() {
+    if (selectedIds.length === 0) return;
+
+    setConvertingToInvoice(true);
     try {
-      const { data } = await api.get(`/vouchers/${row._id}`);
-      setSelected(data.data.voucher);
-    } catch { /* ignore */ }
+      for (const soId of selectedIds) {
+        await api.post(`/vouchers/${soId}/convert-to-invoice`);
+      }
+      notifications.show({
+        title: 'Orders converted',
+        message: `${selectedIds.length} order(s) converted to sales invoice(s)`,
+        color: 'green'
+      });
+      setSelectedIds([]);
+      loadVouchers();
+    } catch (err) {
+      notifications.show({
+        title: 'Conversion failed',
+        message: err.response?.data?.message || 'Failed to convert orders',
+        color: 'red'
+      });
+    } finally {
+      setConvertingToInvoice(false);
+    }
   }
 
   async function handleDelete(voucher) {
@@ -201,6 +247,22 @@ export default function SalesOrders() {
         />
       </PageHeader>
 
+      {selectedIds.length > 0 && (
+        <Alert color="blue" title={`${selectedIds.length} order(s) selected`} mb="md">
+          <Group justify="space-between">
+            <Text size="sm">Select orders to convert to sales invoices</Text>
+            <Button
+              size="sm"
+              leftSection={<IconFileInvoice size={16} />}
+              onClick={handleConvertToInvoice}
+              loading={convertingToInvoice}
+            >
+              Convert to Invoice
+            </Button>
+          </Group>
+        </Alert>
+      )}
+
       {loading ? (
         <Center py="xl"><Loader /></Center>
       ) : vouchers.length === 0 ? (
@@ -208,7 +270,16 @@ export default function SalesOrders() {
       ) : (
         <>
           {Object.entries(grouped).map(([date, list]) => (
-            <OrderGroup key={date} date={date} vouchers={list} onView={viewDetail} onDelete={setDeleteTarget} canDelete={canDeleteSO} />
+            <OrderGroup
+              key={date}
+              date={date}
+              vouchers={list}
+              onView={viewDetail}
+              onDelete={setDeleteTarget}
+              canDelete={canDeleteSO}
+              selectedIds={selectedIds}
+              onSelect={toggleSelect}
+            />
           ))}
           {totalPages > 1 && (
             <Center mt="md">
@@ -218,11 +289,6 @@ export default function SalesOrders() {
         </>
       )}
 
-      <VoucherDetailModal
-        voucher={selected}
-        onClose={() => setSelected(null)}
-        onUpdate={loadVouchers}
-      />
 
       <ConfirmDelete
         opened={!!deleteTarget}
