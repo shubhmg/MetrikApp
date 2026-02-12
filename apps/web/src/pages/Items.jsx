@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Tabs,
@@ -57,6 +57,7 @@ export default function Items() {
   const [deleting, setDeleting] = useState(false);
   const isMobile = useMediaQuery('(max-width: 48em)');
   const [graphsOpen, setGraphsOpen] = useState(false);
+  const initializedRef = useRef(false);
 
   const itemForm = useForm({
     initialValues: { name: '', sku: '', itemGroupId: '', unitId: '', hsnCode: '', gstRate: 18, salesPrice: 0, reorderLevel: 0 },
@@ -65,7 +66,11 @@ export default function Items() {
     initialValues: { name: '', code: '', type: 'raw_material' },
   });
 
-  useEffect(() => { loadAll(); }, []);
+  useEffect(() => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+    loadAll();
+  }, []);
   useEffect(() => {
     if (!groupFilter && groups.length > 0) {
       const fg = groups.find((g) => g.type === 'finished_good');
