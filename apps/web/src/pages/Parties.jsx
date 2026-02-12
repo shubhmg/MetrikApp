@@ -15,13 +15,13 @@ import {
   Text,
   Card,
   Divider,
+  Box,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import { IconPencil, IconTrash, IconPlus } from '@tabler/icons-react';
 import PageHeader from '../components/PageHeader.jsx';
-import DataTable from '../components/DataTable.jsx';
 import ConfirmDelete from '../components/ConfirmDelete.jsx';
 import api from '../services/api.js';
 import { usePermission } from '../hooks/usePermission.js';
@@ -48,6 +48,63 @@ const EMPTY_FORM = {
     itemRates: [],
   },
 };
+
+function fmtDateTime(d) {
+  if (!d) return '-';
+  return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function PartyCard({ party, canWrite, canDelete, onEdit, onDelete, onOpenLedger }) {
+  return (
+    <Card
+      p="sm"
+      style={{
+        cursor: 'pointer',
+        backgroundColor: 'var(--app-surface-elevated)',
+        borderRadius: 'var(--mantine-radius-md)',
+      }}
+      onClick={() => onOpenLedger(party)}
+    >
+      <Group justify="space-between" wrap="nowrap" align="flex-start">
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <Group justify="space-between" wrap="nowrap" align="center" mb={6}>
+            <Text size="sm" fw={600} lineClamp={1}>{party.name}</Text>
+            <Group gap={4}>
+              {party.type?.map((t) => (
+                <Badge key={t} variant="light" size="sm" color={t === 'customer' ? 'teal' : t === 'vendor' ? 'orange' : 'teal'}>
+                  {t}
+                </Badge>
+              ))}
+            </Group>
+          </Group>
+          <Stack gap={2}>
+            {party.phone && <Text size="xs" c="dimmed">{party.phone}</Text>}
+            {party.gstin && <Text size="xs" c="dimmed" ff="monospace">{party.gstin}</Text>}
+            <Text size="xs" c="dimmed">Credit days: {party.creditDays || 0}</Text>
+          </Stack>
+          <Box
+            mt={8}
+            pt={6}
+            style={{
+              borderTop: '1px solid var(--mantine-color-default-border)',
+              marginInline: 4,
+            }}
+          >
+            <Group gap="xs" wrap="nowrap" justify="space-between">
+              <Text size="xs" c="dimmed">
+                Added on: <Text span fw={600} c="dimmed">{fmtDateTime(party.createdAt)}</Text>
+              </Text>
+              <Group gap={4} onClick={(e) => e.stopPropagation()}>
+                {canWrite && <ActionIcon variant="subtle" onClick={() => onEdit(party)}><IconPencil size={16} /></ActionIcon>}
+                {canDelete && <ActionIcon variant="subtle" color="red" onClick={() => onDelete(party)}><IconTrash size={16} /></ActionIcon>}
+              </Group>
+            </Group>
+          </Box>
+        </div>
+      </Group>
+    </Card>
+  );
+}
 
 export default function Parties() {
   const { can, role } = usePermission();
@@ -286,42 +343,25 @@ export default function Parties() {
       </PageHeader>
 
       {!selectOpen && (
-        <DataTable
-          columns={columns}
-          data={filtered}
-          loading={loading}
-          emptyMessage="No parties yet"
-          mobileRender={(r) => (
-          <Card key={r._id} withBorder padding="sm">
-            <Group justify="space-between" wrap="nowrap">
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <Text
-                  fw={600}
-                  c="teal"
-                  style={{ cursor: 'pointer' }}
-                  onClick={() => navigate(`/parties/${r._id}/ledger`)}
-                  truncate
-                >
-                  {r.name}
-                </Text>
-                <Group gap={4} mt={4}>
-                  {r.type.map((t) => (
-                    <Badge key={t} variant="light" size="sm" color={t === 'customer' ? 'teal' : t === 'vendor' ? 'orange' : 'teal'}>
-                      {t}
-                    </Badge>
-                  ))}
-                </Group>
-                {r.phone && <Text size="xs" c="dimmed" mt={2}>{r.phone}</Text>}
-                {r.gstin && <Text size="xs" c="dimmed" ff="monospace" mt={2}>{r.gstin}</Text>}
-              </div>
-              <Group gap={4}>
-                {canWrite && <ActionIcon variant="subtle" onClick={(e) => { e.stopPropagation(); openEdit(r); }}><IconPencil size={16} /></ActionIcon>}
-                {canDelete && <ActionIcon variant="subtle" color="red" onClick={(e) => { e.stopPropagation(); setDeleteTarget(r); }}><IconTrash size={16} /></ActionIcon>}
-              </Group>
-            </Group>
-          </Card>
-        )}
-      />
+        loading ? (
+          <Text size="sm" c="dimmed">Loading parties...</Text>
+        ) : filtered.length === 0 ? (
+          <Text size="sm" c="dimmed">No parties yet</Text>
+        ) : (
+          <Stack gap="sm">
+            {filtered.map((r) => (
+              <PartyCard
+                key={r._id}
+                party={r}
+                canWrite={canWrite}
+                canDelete={canDelete}
+                onEdit={openEdit}
+                onDelete={setDeleteTarget}
+                onOpenLedger={(party) => navigate(`/parties/${party._id}/ledger`)}
+              />
+            ))}
+          </Stack>
+        )
       )}
 
       <Modal

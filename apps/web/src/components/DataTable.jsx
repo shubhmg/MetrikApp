@@ -1,7 +1,7 @@
 import { Table, Text, Center, Loader, Stack } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 
-export default function DataTable({ columns, data, loading, emptyMessage = 'No data found', onRowClick, mobileRender }) {
+export default function DataTable({ columns, data, loading, emptyMessage = 'No data found', onRowClick, mobileRender, alwaysCard = true }) {
   const isMobile = useMediaQuery('(max-width: 48em)');
 
   if (loading) {
@@ -21,7 +21,7 @@ export default function DataTable({ columns, data, loading, emptyMessage = 'No d
   }
 
   // Mobile card view
-  if (isMobile && mobileRender) {
+  if (mobileRender && (isMobile || alwaysCard)) {
     return (
       <Stack gap="xs">
         {data.map((row, i) => mobileRender(row, i))}

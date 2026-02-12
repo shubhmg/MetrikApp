@@ -1,11 +1,100 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Center, Loader, Pagination } from '@mantine/core';
+import { Center, Loader, Pagination, Box, Group, Stack, Text, Badge } from '@mantine/core';
 import PageHeader from '../components/PageHeader.jsx';
-import VoucherList from '../components/VoucherList.jsx';
 import VoucherDetailModal from '../components/VoucherDetailModal.jsx';
 import api from '../services/api.js';
 import { usePermission } from '../hooks/usePermission.js';
+
+function fmtDate(d) {
+  return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function fmtDateTime(d) {
+  if (!d) return '-';
+  return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function InvoiceCard({ voucher, onView }) {
+  const items = voucher.lineItems || [];
+  const shownItems = items.slice(0, 3);
+  const extraCount = items.length - shownItems.length;
+
+  return (
+    <Box
+      p="sm"
+      style={{
+        cursor: 'pointer',
+        backgroundColor: 'var(--app-surface-elevated)',
+        borderRadius: 'var(--mantine-radius-md)',
+      }}
+      onClick={() => onView(voucher)}
+    >
+      <Group justify="space-between" wrap="nowrap" align="flex-start">
+        <Box style={{ flex: 1, minWidth: 0 }}>
+          <Group justify="space-between" wrap="nowrap" align="center" mb={6}>
+            <Group gap="xs" wrap="nowrap" style={{ minWidth: 0 }}>
+              <Text size="sm" fw={600} lineClamp={1}>{voucher.partyId?.name || 'No Party'}</Text>
+              {voucher.materialCentreId?.name && (
+                <Text size="xs" c="teal" fw={600} lineClamp={1}>
+                  [{voucher.materialCentreId.name}]
+                </Text>
+              )}
+              {voucher.status === 'cancelled' && <Badge size="xs" color="red" variant="light">Cancelled</Badge>}
+            </Group>
+          </Group>
+          <Stack gap={4}>
+            {shownItems.map((li, i) => (
+              <Group key={i} gap="xs" wrap="nowrap" justify="space-between">
+                <Text size="xs" c="dimmed" lineClamp={1} style={{ flex: 1 }}>
+                  {li.itemId?.name || li.itemName || '-'}
+                </Text>
+                <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
+                  {li.quantity} {li.itemId?.unit || ''}
+                </Text>
+              </Group>
+            ))}
+            {extraCount > 0 && (
+              <Text size="xs" c="dimmed">+{extraCount} more item{extraCount > 1 ? 's' : ''}</Text>
+            )}
+          </Stack>
+          <Box
+            mt={8}
+            pt={6}
+            style={{
+              borderTop: '1px solid var(--mantine-color-default-border)',
+              marginInline: 4,
+            }}
+          >
+            <Group gap="xs" wrap="nowrap" justify="space-between">
+              <Text size="xs" c="dimmed">
+                Added on: <Text span fw={600} c="dimmed">{fmtDateTime(voucher.createdAt)}</Text>
+              </Text>
+              <Text size="xs" fw={600} c="dimmed" lineClamp={1}>
+                {voucher.createdBy?.name || '-'}
+              </Text>
+            </Group>
+          </Box>
+        </Box>
+      </Group>
+    </Box>
+  );
+}
+
+function InvoiceGroup({ date, vouchers, onView }) {
+  return (
+    <Box mb="md">
+      <Text c="dimmed" size="xs" fw={700} mb="xs" tt="uppercase" style={{ letterSpacing: 0.5 }}>
+        {date}
+      </Text>
+      <Stack gap="sm">
+        {vouchers.map((v) => (
+          <InvoiceCard key={v._id} voucher={v} onView={onView} />
+        ))}
+      </Stack>
+    </Box>
+  );
+}
 
 export default function SalesInvoices() {
   const navigate = useNavigate();
@@ -39,6 +128,16 @@ export default function SalesInvoices() {
     } catch { /* ignore */ }
   }
 
+  const grouped = useMemo(() => {
+    const groups = {};
+    vouchers.forEach((v) => {
+      const d = fmtDate(v.date);
+      if (!groups[d]) groups[d] = [];
+      groups[d].push(v);
+    });
+    return groups;
+  }, [vouchers]);
+
   return (
     <div>
       <PageHeader 
@@ -52,7 +151,9 @@ export default function SalesInvoices() {
         <Center py="xl"><Loader /></Center>
       ) : (
         <>
-          <VoucherList vouchers={vouchers} onItemClick={viewDetail} />
+          {Object.entries(grouped).map(([date, list]) => (
+            <InvoiceGroup key={date} date={date} vouchers={list} onView={viewDetail} />
+          ))}
           {totalPages > 1 && (
             <Center mt="md">
               <Pagination value={page} onChange={setPage} total={totalPages} />

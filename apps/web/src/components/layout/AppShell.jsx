@@ -3,7 +3,6 @@ import { useMediaQuery } from '@mantine/hooks';
 import { Outlet, NavLink as RouterNavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   AppShell as MantineAppShell,
-  Burger,
   Group,
   NavLink,
   Text,
@@ -69,7 +68,7 @@ function isActive(itemPath, locationPath) {
 }
 
 export default function AppShell() {
-  const [sidebarOpened, setSidebarOpened] = useState(false);
+  const [desktopNavCollapsed, setDesktopNavCollapsed] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const { user, logout } = useAuth();
   const { canAny, role } = usePermission();
@@ -153,7 +152,7 @@ export default function AppShell() {
     <>
       <MantineAppShell
         header={{ height: 56 }}
-        navbar={isMobile ? undefined : { width: 260, breakpoint: 'sm', collapsed: { mobile: true } }}
+        navbar={isMobile ? undefined : { width: 260, breakpoint: 'sm', collapsed: { mobile: true, desktop: desktopNavCollapsed } }}
         padding="md"
         style={isMobile ? { '--app-shell-padding': 'var(--mantine-spacing-sm)' } : undefined}
       >
@@ -161,7 +160,9 @@ export default function AppShell() {
           <Group h="100%" px="md" justify="space-between">
             <Group>
               {!isMobile && (
-                <Burger opened={sidebarOpened} onClick={() => setSidebarOpened(!sidebarOpened)} hiddenFrom="sm" size="sm" />
+                <Button size="xs" variant="subtle" onClick={() => setDesktopNavCollapsed((v) => !v)}>
+                  {desktopNavCollapsed ? 'Unsqueeze' : 'Squeeze'}
+                </Button>
               )}
               <Text fw={700} size="1.5rem" c="teal">Metrik</Text>
             </Group>
@@ -200,7 +201,6 @@ export default function AppShell() {
                       label={entry.label}
                       leftSection={<entry.icon size={20} stroke={1.5} />}
                       active={isActive(entry.path, location.pathname)}
-                      onClick={() => setSidebarOpened(false)}
                       style={{ borderRadius: 'var(--mantine-radius-md)' }}
                     />
                   );
@@ -219,7 +219,6 @@ export default function AppShell() {
                         label={item.label}
                         leftSection={<item.icon size={20} stroke={1.5} />}
                         active={isActive(item.path, location.pathname)}
-                        onClick={() => setSidebarOpened(false)}
                         style={{ borderRadius: 'var(--mantine-radius-md)' }}
                       />
                     ))}
