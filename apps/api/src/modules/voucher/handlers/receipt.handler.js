@@ -15,17 +15,12 @@ export function validate(data) {
   for (const li of data.lineItems) {
     if (!li.accountId) throw ApiError.badRequest('Each line must have an accountId');
     if (!li.debit && !li.credit) throw ApiError.badRequest('Each line must have debit or credit');
-
-    // NEW VALIDATION FOR RECEIPT WITH PARTY
-    if (data.partyId && li.credit && li.credit > 0) {
-      throw ApiError.badRequest('For a Receipt with a Party, line items should only contain Debits (e.g., Cash/Bank accounts).');
-    }
   }
-  // If partyId is present, ensure total debits from line items > 0
+  // If partyId is present, ensure at least one line has debit (money received)
   if (data.partyId) {
     const totalDebitsInLines = data.lineItems.reduce((sum, li) => sum + (li.debit || 0), 0);
     if (totalDebitsInLines <= 0) {
-      throw ApiError.badRequest('For a Receipt with a Party, total debits in line items must be greater than zero.');
+      throw ApiError.badRequest('Receipt with a Party must have at least one debit entry (e.g., Cash/Bank account receiving money)');
     }
   }
 }
