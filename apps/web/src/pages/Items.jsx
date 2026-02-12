@@ -46,7 +46,7 @@ export default function Items() {
   const [units, setUnits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [groupFilter, setGroupFilter] = useState('');
-  const [filtering, setFiltering] = useState(false);
+  const [itemsLoading, setItemsLoading] = useState(false);
 
   // Modal state
   const [modalType, setModalType] = useState(null); // 'item' | 'group'
@@ -59,7 +59,8 @@ export default function Items() {
   const isMobile = useMediaQuery('(max-width: 48em)');
   const [graphsOpen, setGraphsOpen] = useState(false);
   const initializedRef = useRef(false);
-  const filterRafRef = useRef(null);
+  const metaReadyRef = useRef(false);
+  const hasHandledFirstFilterEffectRef = useRef(false);
 
   const itemForm = useForm({
     initialValues: { name: '', sku: '', itemGroupId: '', unitId: '', hsnCode: '', gstRate: 18, salesPrice: 0, reorderLevel: 0 },
@@ -71,42 +72,51 @@ export default function Items() {
   useEffect(() => {
     if (initializedRef.current) return;
     initializedRef.current = true;
-    loadAll();
+    loadInitialData();
   }, []);
-  useEffect(() => {
-    if (!groupFilter && groups.length > 0) {
-      const fg = groups.find((g) => g.type === 'finished_good');
-      if (fg) setGroupFilter(fg._id);
-    }
-  }, [groups, groupFilter]);
 
-  useEffect(() => () => {
-    if (filterRafRef.current) cancelAnimationFrame(filterRafRef.current);
-  }, []);
+  useEffect(() => {
+    if (!metaReadyRef.current) return;
+    if (!hasHandledFirstFilterEffectRef.current) {
+      hasHandledFirstFilterEffectRef.current = true;
+      return;
+    }
+    loadItems(groupFilter);
+  }, [groupFilter]);
 
   function handleGroupFilterChange(v) {
-    const next = v || '';
-    setFiltering(true);
-    if (filterRafRef.current) cancelAnimationFrame(filterRafRef.current);
-    filterRafRef.current = requestAnimationFrame(() => {
-      setGroupFilter(next);
-      setFiltering(false);
-    });
+    setGroupFilter(v || '');
   }
 
-  async function loadAll() {
+  async function loadInitialData() {
     setLoading(true);
+    metaReadyRef.current = false;
     try {
-      const [itemsRes, groupsRes, unitsRes] = await Promise.all([
-        api.get('/items'),
+      const [groupsRes, unitsRes] = await Promise.all([
         api.get('/items/groups'),
         api.get('/items/units'),
       ]);
-      setItems(itemsRes.data.data.items);
-      setGroups(groupsRes.data.data.itemGroups);
+      const loadedGroups = groupsRes.data.data.itemGroups || [];
+      setGroups(loadedGroups);
       setUnits(unitsRes.data.data.units || []);
+
+      const defaultGroup = loadedGroups.find((g) => g.type === 'finished_good')?._id || '';
+      setGroupFilter(defaultGroup);
+      await loadItems(defaultGroup);
+      metaReadyRef.current = true;
+      hasHandledFirstFilterEffectRef.current = false;
     } catch { /* ignore */ }
     setLoading(false);
+  }
+
+  async function loadItems(itemGroupId = '') {
+    setItemsLoading(true);
+    try {
+      const params = itemGroupId ? { itemGroupId } : undefined;
+      const itemsRes = await api.get('/items', { params });
+      setItems(itemsRes.data.data.items || []);
+    } catch { /* ignore */ }
+    setItemsLoading(false);
   }
 
   // --- Items ---
@@ -168,7 +178,7 @@ export default function Items() {
         notifications.show({ title: 'Item created', color: 'green' });
       }
       setModalType(null);
-      loadAll();
+      loadItems(groupFilter);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to save');
     }
@@ -187,7 +197,7 @@ export default function Items() {
         notifications.show({ title: 'Group created', color: 'green' });
       }
       setModalType(null);
-      loadAll();
+      loadInitialData();
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to save');
     }
@@ -203,7 +213,11 @@ export default function Items() {
       notifications.show({ title: 'Deleted', color: 'green' });
       setDeleteTarget(null);
       setDeleteType(null);
-      loadAll();
+      if (deleteType === 'group') {
+        loadInitialData();
+      } else {
+        loadItems(groupFilter);
+      }
     } catch (err) {
       notifications.show({ title: 'Error', message: err.response?.data?.message || 'Failed', color: 'red' });
     }
@@ -229,10 +243,6 @@ export default function Items() {
       ),
     },
   ];
-
-  const filteredItems = groupFilter
-    ? items.filter((i) => (i.itemGroupId?._id || i.itemGroupId) === groupFilter)
-    : items;
 
   const groupColumns = [
     { key: 'code', label: 'Code', render: (r) => r.code, style: { fontFamily: 'monospace' } },
@@ -319,8 +329,8 @@ export default function Items() {
           )}
           <DataTable
             columns={itemColumns}
-            data={filteredItems}
-            loading={loading || filtering}
+            data={items}
+            loading={loading || itemsLoading}
             emptyMessage="No items yet"
             mobileRender={(r) => (
               <Card key={r._id} withBorder padding="sm">
