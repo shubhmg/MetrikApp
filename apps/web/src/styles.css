@@ -270,3 +270,78 @@ textarea {
 [data-mantine-color-scheme='dark'] ::-webkit-scrollbar-thumb:hover {
   background: var(--mantine-color-dark-6);
 }
+
+/* Hide autofill suggestion icons on mobile keyboards */
+input::-webkit-autofill,
+input::-webkit-autofill:hover,
+input::-webkit-autofill:focus,
+input::-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px var(--app-surface) inset !important;
+  box-shadow: 0 0 0 30px var(--app-surface) inset !important;
+}
+
+input::-webkit-autofill {
+  -webkit-text-fill-color: var(--app-text) !important;
+  caret-color: var(--app-text) !important;
+}
+
+/* Remove autofill background for Mantine inputs */
+:where(.mantine-Input-input)::-webkit-autofill,
+:where(.mantine-Input-input)::-webkit-autofill:hover,
+:where(.mantine-Input-input)::-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 30px var(--app-surface) inset !important;
+  -webkit-text-fill-color: var(--app-text) !important;
+}
+
+/* Hide password manager icons in input fields */
+input::-webkit-contacts-auto-fill-button,
+input::-webkit-credentials-auto-fill-button {
+  visibility: hidden;
+  display: none !important;
+  pointer-events: none;
+  height: 0;
+  width: 0;
+  margin: 0;
+  padding: 0;
+}
+
+/* Disable autofill for all input types */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="tel"],
+input[type="url"],
+textarea,
+select {
+  -webkit-autofill-highlight-color: transparent;
+}
+
+/* Remove box shadow from autofilled inputs */
+:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0px 1000px var(--app-surface) inset !important;
+}
+
+/* Dark mode autofill support */
+[data-mantine-color-scheme='dark'] input::-webkit-autofill,
+[data-mantine-color-scheme='dark'] input::-webkit-autofill:hover,
+[data-mantine-color-scheme='dark'] input::-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 30px var(--app-surface) inset !important;
+  -webkit-text-fill-color: var(--app-text) !important;
+}
+
+/* Hide suggestion dropdown indicators */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* Prevent weird spacing from autofill icons */
+input::placeholder {
+  color: var(--app-muted);
+  opacity: 1;
+}

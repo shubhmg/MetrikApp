@@ -80,5 +80,46 @@ export function initNativeAppFeatures() {
       updateStatusBarColor();
     }
   });
-}
 
+  // Disable autofill and hide autofill suggestion icons
+  function disableAutofill() {
+    // Apply to existing inputs
+    document.querySelectorAll('input, textarea, select').forEach(input => {
+      input.setAttribute('autocomplete', 'off');
+      input.setAttribute('autocorrect', 'off');
+      input.setAttribute('autocapitalize', 'off');
+      input.setAttribute('spellcheck', 'false');
+    });
+
+    // Intercept new inputs added dynamically
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        mutation.addedNodes.forEach((node) => {
+          if (node.nodeType === 1) { // Element node
+            if (node.matches('input, textarea, select')) {
+              node.setAttribute('autocomplete', 'off');
+              node.setAttribute('autocorrect', 'off');
+              node.setAttribute('autocapitalize', 'off');
+              node.setAttribute('spellcheck', 'false');
+            }
+            node.querySelectorAll('input, textarea, select').forEach(input => {
+              input.setAttribute('autocomplete', 'off');
+              input.setAttribute('autocorrect', 'off');
+              input.setAttribute('autocapitalize', 'off');
+              input.setAttribute('spellcheck', 'false');
+            });
+          }
+        });
+      });
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
+  }
+
+  // Call after a small delay to ensure DOM is ready
+  setTimeout(disableAutofill, 100);
+  document.addEventListener('DOMContentLoaded', disableAutofill);
+}
