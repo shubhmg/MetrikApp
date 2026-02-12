@@ -23,6 +23,7 @@ function getAllowedVoucherTypes(role, permissions = []) {
 
 export async function listVouchers(businessId, filters = {}, access = {}) {
   const query = { businessId };
+  const isOrderType = filters.voucherType === 'sales_order' || filters.voucherType === 'purchase_order';
 
   const allowedTypes = getAllowedVoucherTypes(access.role, access.permissions || []);
   if (filters.voucherType) {
@@ -33,7 +34,12 @@ export async function listVouchers(businessId, filters = {}, access = {}) {
   } else if (allowedTypes) {
     query.voucherType = { $in: allowedTypes };
   }
-  if (filters.status) query.status = filters.status;
+  if (filters.status) {
+    query.status = filters.status;
+  } else if (isOrderType) {
+    // Order lists should show active orders by default.
+    query.status = VOUCHER_STATUS.POSTED;
+  }
   if (filters.partyId) query.partyId = filters.partyId;
   if (filters.materialCentreId) query.materialCentreId = filters.materialCentreId;
 
