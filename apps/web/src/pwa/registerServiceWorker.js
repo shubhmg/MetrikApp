@@ -81,45 +81,95 @@ export function initNativeAppFeatures() {
     }
   });
 
-  // Disable autofill and hide autofill suggestion icons
+  // Disable autofill and hide autofill suggestion icons - AGGRESSIVE approach
   function disableAutofill() {
-    // Apply to existing inputs
-    document.querySelectorAll('input, textarea, select').forEach(input => {
+    // 1. Apply to all existing inputs immediately
+    const allInputs = document.querySelectorAll('input, textarea, select');
+    allInputs.forEach(input => {
+      // Disable all forms of autocomplete
       input.setAttribute('autocomplete', 'off');
       input.setAttribute('autocorrect', 'off');
       input.setAttribute('autocapitalize', 'off');
       input.setAttribute('spellcheck', 'false');
+      input.setAttribute('data-autofill', 'off');
+
+      // Add transition delay to prevent autofill animation
+      input.style.transition = 'background-color 5000s ease-in-out 0s';
     });
 
-    // Intercept new inputs added dynamically
+    // 2. Intercept form submissions to clear autofill
+    document.querySelectorAll('form').forEach(form => {
+      form.setAttribute('autocomplete', 'off');
+
+      form.addEventListener('submit', (e) => {
+        // This won't prevent submission, just clears autofill data
+        allInputs.forEach(input => {
+          if (input.value) {
+            // Keep the value but prevent autofill suggestions
+            input.style.transition = 'background-color 5000s ease-in-out 0s';
+          }
+        });
+      });
+    });
+
+    // 3. Watch for autofill and immediately override it
     const observer = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
         mutation.addedNodes.forEach((node) => {
           if (node.nodeType === 1) { // Element node
-            if (node.matches('input, textarea, select')) {
-              node.setAttribute('autocomplete', 'off');
-              node.setAttribute('autocorrect', 'off');
-              node.setAttribute('autocapitalize', 'off');
-              node.setAttribute('spellcheck', 'false');
+            // Handle single input elements
+            if (node.matches && node.matches('input, textarea, select')) {
+              applyAutofillDisable(node);
             }
-            node.querySelectorAll('input, textarea, select').forEach(input => {
-              input.setAttribute('autocomplete', 'off');
-              input.setAttribute('autocorrect', 'off');
-              input.setAttribute('autocapitalize', 'off');
-              input.setAttribute('spellcheck', 'false');
+            // Handle parent containers with inputs
+            node.querySelectorAll && node.querySelectorAll('input, textarea, select').forEach(input => {
+              applyAutofillDisable(input);
             });
           }
         });
       });
     });
 
-    observer.observe(document.body, {
+    observer.observe(document.documentElement, {
       childList: true,
       subtree: true,
     });
+
+    // 4. Also watch for autofill by checking input styles
+    setInterval(() => {
+      document.querySelectorAll('input, textarea, select').forEach(input => {
+        const styles = window.getComputedStyle(input);
+        // If autofilled, reapply our styles
+        if (styles.webkitAutofillBackground || input.matches(':-webkit-autofill')) {
+          input.style.transition = 'background-color 5000s ease-in-out 0s';
+          input.style.WebkitTextFillColor = getComputedStyle(document.documentElement).getPropertyValue('--app-text');
+        }
+      });
+    }, 100);
   }
 
-  // Call after a small delay to ensure DOM is ready
-  setTimeout(disableAutofill, 100);
+  // Helper function to apply autofill disabling
+  function applyAutofillDisable(input) {
+    input.setAttribute('autocomplete', 'off');
+    input.setAttribute('autocorrect', 'off');
+    input.setAttribute('autocapitalize', 'off');
+    input.setAttribute('spellcheck', 'false');
+    input.setAttribute('data-autofill', 'off');
+    input.style.transition = 'background-color 5000s ease-in-out 0s';
+
+    // Prevent autofill color change
+    input.addEventListener('change', () => {
+      input.style.transition = 'background-color 5000s ease-in-out 0s';
+    });
+  }
+
+  // Call autofill disabling
+  disableAutofill();
   document.addEventListener('DOMContentLoaded', disableAutofill);
+  window.addEventListener('load', disableAutofill);
+
+  // Also run after a longer delay to catch lazy-loaded forms
+  setTimeout(disableAutofill, 500);
+  setTimeout(disableAutofill, 1000);
+  setTimeout(disableAutofill, 2000);
 }
