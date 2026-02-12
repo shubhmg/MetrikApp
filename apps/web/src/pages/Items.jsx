@@ -46,6 +46,7 @@ export default function Items() {
   const [units, setUnits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [groupFilter, setGroupFilter] = useState('');
+  const [filtering, setFiltering] = useState(false);
 
   // Modal state
   const [modalType, setModalType] = useState(null); // 'item' | 'group'
@@ -58,6 +59,7 @@ export default function Items() {
   const isMobile = useMediaQuery('(max-width: 48em)');
   const [graphsOpen, setGraphsOpen] = useState(false);
   const initializedRef = useRef(false);
+  const filterRafRef = useRef(null);
 
   const itemForm = useForm({
     initialValues: { name: '', sku: '', itemGroupId: '', unitId: '', hsnCode: '', gstRate: 18, salesPrice: 0, reorderLevel: 0 },
@@ -77,6 +79,20 @@ export default function Items() {
       if (fg) setGroupFilter(fg._id);
     }
   }, [groups, groupFilter]);
+
+  useEffect(() => () => {
+    if (filterRafRef.current) cancelAnimationFrame(filterRafRef.current);
+  }, []);
+
+  function handleGroupFilterChange(v) {
+    const next = v || '';
+    setFiltering(true);
+    if (filterRafRef.current) cancelAnimationFrame(filterRafRef.current);
+    filterRafRef.current = requestAnimationFrame(() => {
+      setGroupFilter(next);
+      setFiltering(false);
+    });
+  }
 
   async function loadAll() {
     setLoading(true);
@@ -253,7 +269,7 @@ export default function Items() {
                   ...groups.map((g) => ({ value: g._id, label: g.name })),
                 ]}
                 value={groupFilter}
-                onChange={(v) => setGroupFilter(v || '')}
+                onChange={handleGroupFilterChange}
                 w="100%"
               />
               <Group gap="xs" align="center">
@@ -284,7 +300,7 @@ export default function Items() {
                   ...groups.map((g) => ({ value: g._id, label: g.name })),
                 ]}
                 value={groupFilter}
-                onChange={(v) => setGroupFilter(v || '')}
+                onChange={handleGroupFilterChange}
                 w={220}
               />
               <Group gap="xs">
@@ -304,6 +320,7 @@ export default function Items() {
           <DataTable
             columns={itemColumns}
             data={filteredItems}
+            loading={loading || filtering}
             emptyMessage="No items yet"
             mobileRender={(r) => (
               <Card key={r._id} withBorder padding="sm">
