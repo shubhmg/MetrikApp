@@ -28,6 +28,14 @@ export default function errorHandler(err, req, res, _next) {
     });
   }
 
+  // Mongoose cast error (invalid ObjectId, etc.)
+  if (err.name === 'CastError') {
+    return res.status(400).json({
+      success: false,
+      message: `Invalid value for ${err.path}`,
+    });
+  }
+
   // JWT errors
   if (err.name === 'JsonWebTokenError') {
     return res.status(401).json({ success: false, message: 'Invalid token' });

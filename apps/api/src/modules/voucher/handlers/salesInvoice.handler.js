@@ -11,6 +11,7 @@ import ApiError from '../../../utils/ApiError.js';
 
 export function validate(data) {
   if (!data.partyId) throw ApiError.badRequest('Party is required for sales invoice');
+  if (!data.materialCentreId) throw ApiError.badRequest('Material centre is required for sales invoice');
   if (!data.lineItems || data.lineItems.length === 0) {
     throw ApiError.badRequest('At least one line item is required');
   }

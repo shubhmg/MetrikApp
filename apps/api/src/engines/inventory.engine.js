@@ -106,6 +106,18 @@ export async function postEntries(entries, session) {
     } else {
       // OUT: decrement using weighted average rate
       const existing = await withSession(StockSummary.findOne(filter), session);
+      if (!existing || existing.quantity < entry.quantity) {
+        const [itemDoc, mcDoc] = await Promise.all([
+          withSession(Item.findById(entry.itemId).select('name sku'), session),
+          withSession(MaterialCentre.findById(entry.materialCentreId).select('name code'), session),
+        ]);
+        const itemLabel = itemDoc ? `${itemDoc.name}${itemDoc.sku ? ` (${itemDoc.sku})` : ''}` : entry.itemId;
+        const mcLabel = mcDoc ? `${mcDoc.name}${mcDoc.code ? ` (${mcDoc.code})` : ''}` : entry.materialCentreId;
+        const available = existing?.quantity || 0;
+        throw ApiError.badRequest(
+          `Insufficient stock for item ${itemLabel} at MC ${mcLabel}: available=${available}, requested=${entry.quantity}`
+        );
+      }
       const outValue = entry.quantity * existing.weightedAvgRate;
       const newQty = existing.quantity - entry.quantity;
       const newTotalValue = existing.totalValue - outValue;

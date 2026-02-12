@@ -1,4 +1,5 @@
 import ApiError from '../../../utils/ApiError.js';
+import mongoose from 'mongoose';
 
 /**
  * Receipt handler (money coming in).
@@ -14,6 +15,9 @@ export function validate(data) {
   }
   for (const li of data.lineItems) {
     if (!li.accountId) throw ApiError.badRequest('Each line must have an accountId');
+    if (!mongoose.isValidObjectId(li.accountId)) {
+      throw ApiError.badRequest('Invalid account selected in receipt line');
+    }
     if (!li.debit && !li.credit) throw ApiError.badRequest('Each line must have debit or credit');
   }
   // If partyId is present, ensure at least one line has debit (money received)

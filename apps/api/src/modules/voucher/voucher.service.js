@@ -159,6 +159,15 @@ export async function convertOrderToInvoice(orderId, businessId, userId) {
   if (order.status === 'cancelled') {
     throw ApiError.badRequest('Cannot convert a cancelled order');
   }
+  if (!order.partyId) {
+    throw ApiError.badRequest('Cannot convert order without party');
+  }
+  if (!order.materialCentreId) {
+    throw ApiError.badRequest('Cannot convert order without material centre');
+  }
+  if (!order.lineItems?.length) {
+    throw ApiError.badRequest('Cannot convert order without line items');
+  }
 
   const lineItems = order.lineItems.map((li) => ({
     itemId: li.itemId,
