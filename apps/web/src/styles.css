@@ -46,11 +46,6 @@
   :root {
     --app-tabbar-height: 60px;
   }
-  :where(.mantine-Input-input),
-  :where(.mantine-Select-input),
-  :where(.mantine-Textarea-input) {
-    border-radius: var(--mantine-radius-sm) !important;
-  }
   html {
     font-size: 15px;
   }
@@ -87,6 +82,14 @@ body {
 :where(.mantine-InputWrapper-label) {
   display: block;
   margin-bottom: 6px;
+}
+
+:where(.mantine-Input-input),
+:where(.mantine-Select-input),
+:where(.mantine-Textarea-input),
+:where(.mantine-PillsInput-input),
+:where(.mantine-DateInput-input) {
+  border-radius: 0 !important;
 }
 
 :where(.ledger-accent-row) {

@@ -48,6 +48,7 @@ export default function Inventory() {
   const [stockData, setStockData] = useState([]);
   const [stockMcFilter, setStockMcFilter] = useState(null);
   const [stockGroupFilter, setStockGroupFilter] = useState(null);
+  const [stockFiltersReady, setStockFiltersReady] = useState(false);
   const [stockLoading, setStockLoading] = useState(false);
   const [stockSelectOpen, setStockSelectOpen] = useState(false);
 
@@ -67,7 +68,10 @@ export default function Inventory() {
   });
 
   useEffect(() => { loadAll(); }, []);
-  useEffect(() => { loadStockReport(); }, [stockMcFilter, stockGroupFilter]);
+  useEffect(() => {
+    if (!stockFiltersReady) return;
+    loadStockReport();
+  }, [stockFiltersReady, stockMcFilter, stockGroupFilter]);
 
   async function loadAll() {
     setLoading(true);
@@ -80,14 +84,11 @@ export default function Inventory() {
       const loadedGroups = groupsRes.data.data.itemGroups;
       setMcs(loadedMcs);
       setGroups(loadedGroups);
-      if (!stockMcFilter) {
-        const defaultMc = loadedMcs.find((mc) => mc.isDefault) || loadedMcs[0];
-        if (defaultMc) setStockMcFilter(defaultMc._id);
-      }
-      if (!stockGroupFilter) {
-        const finishedGroup = loadedGroups.find((g) => g.type === 'finished_good') || loadedGroups[0];
-        if (finishedGroup) setStockGroupFilter(finishedGroup._id);
-      }
+      const nextMcFilter = stockMcFilter || loadedMcs.find((mc) => mc.isDefault)?._id || loadedMcs[0]?._id || null;
+      const nextGroupFilter = stockGroupFilter || loadedGroups.find((g) => g.type === 'finished_good')?._id || loadedGroups[0]?._id || null;
+      setStockMcFilter(nextMcFilter);
+      setStockGroupFilter(nextGroupFilter);
+      setStockFiltersReady(true);
     } catch { /* ignore */ }
     setLoading(false);
   }
