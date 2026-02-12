@@ -2,7 +2,7 @@ import Voucher from './voucher.model.js';
 import StockSummary from './stockSummary.model.js';
 import * as voucherEngine from '../../engines/voucher.engine.js';
 import ApiError from '../../utils/ApiError.js';
-import { ROLES } from '../../config/constants.js';
+import { ROLES, VOUCHER_STATUS } from '../../config/constants.js';
 import { VOUCHER_TYPE_MODULE_MAP } from '../../config/permissions.js';
 
 export async function createVoucher(data, businessId, userId) {
@@ -193,5 +193,23 @@ export async function convertOrderToInvoice(orderId, businessId, userId) {
     ],
   };
 
-  return voucherEngine.create(invoiceData, businessId, userId);
+  const invoice = await voucherEngine.create(invoiceData, businessId, userId);
+
+  // Mark source order as converted so it no longer appears in active order workflows.
+  order.status = VOUCHER_STATUS.CANCELLED;
+  order.cancelledAt = new Date();
+  order.cancelledBy = userId;
+  order.cancellationReason = `Converted to ${invoice.voucherNumber}`;
+  order.linkedVouchers = [
+    ...(order.linkedVouchers || []),
+    {
+      voucherId: invoice._id,
+      voucherType: invoice.voucherType,
+      relationship: 'converted_to',
+    },
+  ];
+  order.updatedBy = userId;
+  await order.save();
+
+  return invoice;
 }

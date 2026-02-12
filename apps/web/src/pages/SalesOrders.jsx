@@ -153,7 +153,7 @@ export default function SalesOrders() {
   async function loadVouchers() {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ page, limit: 50, voucherType: 'sales_order' });
+      const params = new URLSearchParams({ page, limit: 50, voucherType: 'sales_order', status: 'posted' });
       if (mcFilter) params.set('materialCentreId', mcFilter);
       const { data } = await api.get(`/vouchers?${params}`);
       setVouchers(data.data.vouchers);
