@@ -5,7 +5,7 @@
   --app-border: #e5e7eb;
   --app-text: #0f172a;
   --app-muted: #64748b;
-  --app-header-height: 56px;
+  --app-header-height: calc(56px + var(--safe-area-inset-top));
   --app-tabbar-height: 0px;
   --app-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
   --safe-area-inset-top: env(safe-area-inset-top, 0);

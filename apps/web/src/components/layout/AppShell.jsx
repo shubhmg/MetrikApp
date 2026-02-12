@@ -153,13 +153,13 @@ export default function AppShell() {
   return (
     <>
       <MantineAppShell
-        header={{ height: 56 }}
+        header={{ height: 'var(--app-header-height)' }}
         navbar={isMobile ? undefined : { width: 260, breakpoint: 'sm', collapsed: { mobile: true, desktop: desktopNavCollapsed } }}
         padding="md"
         style={isMobile ? { '--app-shell-padding': 'var(--mantine-spacing-sm)' } : undefined}
       >
         <MantineAppShell.Header className="app-header">
-          <Group h="100%" px="md" justify="space-between">
+          <Group h="100%" px="md" justify="space-between" style={{ paddingTop: 'var(--safe-area-inset-top)' }}>
             <Group>
               {!isMobile && (
                 <ActionIcon
