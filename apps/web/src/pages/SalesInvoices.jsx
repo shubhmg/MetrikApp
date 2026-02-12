@@ -27,6 +27,7 @@ function InvoiceCard({ voucher, onView }) {
     >
       <Group justify="space-between" wrap="nowrap" align="flex-start">
         <Box style={{ flex: 1, minWidth: 0 }}>
+          <Text size="xs" c="dimmed" ff="monospace" mb={4}>{voucher.voucherNumber}</Text>
           <Group justify="space-between" wrap="nowrap" align="center" mb={6}>
             <Group gap="xs" wrap="nowrap" style={{ minWidth: 0 }}>
               <Text size="sm" fw={600} lineClamp={1}>{voucher.partyId?.name || 'No Party'}</Text>
@@ -35,7 +36,6 @@ function InvoiceCard({ voucher, onView }) {
                   [{voucher.materialCentreId.name}]
                 </Text>
               )}
-              <Text size="xs" c="dimmed" ff="monospace">{voucher.voucherNumber}</Text>
               {voucher.status === 'cancelled' && <Badge size="xs" color="red" variant="light">Cancelled</Badge>}
             </Group>
           </Group>
