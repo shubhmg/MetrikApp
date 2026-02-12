@@ -31,9 +31,7 @@ export async function postEntries(entries, session) {
     );
   }
 
-  const opts = session ? { session } : {};
-
-  const docs = await JournalEntry.create(
+  const docs = await JournalEntry.insertMany(
     entries.map((e) => ({
       businessId: e.businessId,
       voucherId: e.voucherId,
@@ -46,7 +44,7 @@ export async function postEntries(entries, session) {
       narration: e.narration,
       financialYear: e.financialYear,
     })),
-    opts
+    { ...(session ? { session } : {}), ordered: true }
   );
 
   return docs;
@@ -62,8 +60,6 @@ export async function reverseEntries(voucherId, businessId, session) {
   );
   if (originals.length === 0) return [];
 
-  const opts = session ? { session } : {};
-
   const reversals = originals.map((orig) => ({
     businessId,
     voucherId: orig.voucherId,
@@ -78,7 +74,10 @@ export async function reverseEntries(voucherId, businessId, session) {
     isReverse: true,
   }));
 
-  return JournalEntry.create(reversals, opts);
+  return JournalEntry.insertMany(
+    reversals,
+    { ...(session ? { session } : {}), ordered: true }
+  );
 }
 
 export default { postEntries, reverseEntries };
