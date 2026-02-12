@@ -10,11 +10,6 @@ function fmtDate(d) {
   return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-function fmtDateTime(d) {
-  if (!d) return '-';
-  return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-}
-
 function InvoiceCard({ voucher, onView }) {
   const items = voucher.lineItems || [];
   const shownItems = items.slice(0, 3);
@@ -40,6 +35,7 @@ function InvoiceCard({ voucher, onView }) {
                   [{voucher.materialCentreId.name}]
                 </Text>
               )}
+              <Text size="xs" c="dimmed" ff="monospace">{voucher.voucherNumber}</Text>
               {voucher.status === 'cancelled' && <Badge size="xs" color="red" variant="light">Cancelled</Badge>}
             </Group>
           </Group>
@@ -58,23 +54,6 @@ function InvoiceCard({ voucher, onView }) {
               <Text size="xs" c="dimmed">+{extraCount} more item{extraCount > 1 ? 's' : ''}</Text>
             )}
           </Stack>
-          <Box
-            mt={8}
-            pt={6}
-            style={{
-              borderTop: '1px solid var(--mantine-color-default-border)',
-              marginInline: 4,
-            }}
-          >
-            <Group gap="xs" wrap="nowrap" justify="space-between">
-              <Text size="xs" c="dimmed">
-                Added on: <Text span fw={600} c="dimmed">{fmtDateTime(voucher.createdAt)}</Text>
-              </Text>
-              <Text size="xs" fw={600} c="dimmed" lineClamp={1}>
-                {voucher.createdBy?.name || '-'}
-              </Text>
-            </Group>
-          </Box>
         </Box>
       </Group>
     </Box>

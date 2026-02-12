@@ -33,6 +33,8 @@ import {
   IconReceipt,
   IconPlus,
   IconUsersGroup,
+  IconChevronLeft,
+  IconChevronRight,
 } from '@tabler/icons-react';
 import { useAuth } from '../../hooks/useAuth.js';
 import { usePermission } from '../../hooks/usePermission.js';
@@ -160,9 +162,16 @@ export default function AppShell() {
           <Group h="100%" px="md" justify="space-between">
             <Group>
               {!isMobile && (
-                <Button size="xs" variant="subtle" onClick={() => setDesktopNavCollapsed((v) => !v)}>
-                  {desktopNavCollapsed ? 'Unsqueeze' : 'Squeeze'}
-                </Button>
+                <ActionIcon
+                  size="lg"
+                  radius="md"
+                  variant="light"
+                  color="gray"
+                  onClick={() => setDesktopNavCollapsed((v) => !v)}
+                  aria-label={desktopNavCollapsed ? 'Show sidebar' : 'Hide sidebar'}
+                >
+                  {desktopNavCollapsed ? <IconChevronRight size={18} /> : <IconChevronLeft size={18} />}
+                </ActionIcon>
               )}
               <Text fw={700} size="1.5rem" c="teal">Metrik</Text>
             </Group>
