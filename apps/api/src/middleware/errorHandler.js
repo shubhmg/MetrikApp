@@ -1,4 +1,5 @@
 import ApiError from '../utils/ApiError.js';
+import env from '../config/env.js';
 
 export default function errorHandler(err, req, res, _next) {
   if (err instanceof ApiError) {
@@ -45,8 +46,10 @@ export default function errorHandler(err, req, res, _next) {
   }
 
   console.error('Unhandled error:', err);
+  const showDetails = env.nodeEnv !== 'production';
   return res.status(500).json({
     success: false,
     message: 'Internal server error',
+    ...(showDetails ? { details: err.message, stack: err.stack } : {}),
   });
 }
