@@ -20,6 +20,8 @@ const materialCentreSchema = new mongoose.Schema({
     pincode: String,
   },
   isDefault: { type: Boolean, default: false },
+  invoicePrintEmail: { type: String, trim: true, lowercase: true },
+  autoInvoicePrintEnabled: { type: Boolean, default: false },
   isActive: { type: Boolean, default: true },
 });
 

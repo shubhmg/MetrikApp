@@ -17,6 +17,7 @@ import Receipts from './pages/Receipts.jsx';
 import SalesOrders from './pages/SalesOrders.jsx';
 import PurchaseOrders from './pages/PurchaseOrders.jsx';
 import Members from './pages/Members.jsx';
+import Settings from './pages/Settings.jsx';
 import { useAuthStore } from './store/authStore.js';
 import { usePermission } from './hooks/usePermission.js';
 
@@ -130,7 +131,7 @@ export const router = createBrowserRouter([
       { path: 'parties/:id/ledger', element: <PermissionRoute module="party"><PartyLedger /></PermissionRoute> },
       { path: 'accounting', element: <PermissionRoute module="accounting"><Accounting /></PermissionRoute> },
       { path: 'members', element: <NonContractorRoute><PermissionRoute module="member"><Members /></PermissionRoute></NonContractorRoute> },
-      { path: 'settings', element: <Placeholder title="Settings" /> },
+      { path: 'settings', element: <Settings /> },
     ],
   },
 ]);

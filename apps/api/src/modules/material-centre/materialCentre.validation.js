@@ -16,6 +16,8 @@ export const createMCSchema = {
       pincode: Joi.string().allow('').optional(),
     }).optional(),
     isDefault: Joi.boolean().optional(),
+    invoicePrintEmail: Joi.string().email().allow('', null).optional(),
+    autoInvoicePrintEnabled: Joi.boolean().optional(),
   }),
 };
 
@@ -23,6 +25,8 @@ export const updateMCSchema = {
   params: Joi.object({ id: Joi.string().required() }),
   body: Joi.object({
     name: Joi.string().min(1).max(200).optional(),
+    code: Joi.string().min(1).max(50).optional(),
+    type: Joi.string().valid(...mcTypeValues).optional(),
     address: Joi.object({
       line1: Joi.string().allow('').optional(),
       line2: Joi.string().allow('').optional(),
@@ -31,6 +35,8 @@ export const updateMCSchema = {
       pincode: Joi.string().allow('').optional(),
     }).optional(),
     isDefault: Joi.boolean().optional(),
+    invoicePrintEmail: Joi.string().email().allow('', null).optional(),
+    autoInvoicePrintEnabled: Joi.boolean().optional(),
     isActive: Joi.boolean().optional(),
   }).min(1),
 };

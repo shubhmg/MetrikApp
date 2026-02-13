@@ -58,12 +58,34 @@ export async function getBusinessById(businessId, userId) {
 }
 
 export async function updateBusiness(businessId, data, userId) {
+  const user = await User.findById(userId).select('businesses');
+  const membership = user?.businesses?.find(
+    (b) => b.businessId.toString() === businessId && b.isActive
+  );
+  if (!membership) throw ApiError.forbidden('No access to this business');
+  if (![ROLES.OWNER, ROLES.ADMIN].includes(membership.role)) {
+    throw ApiError.forbidden('Only owner/admin can update business settings');
+  }
+
   const business = await Business.findById(businessId);
   if (!business || business.isDeleted) {
     throw ApiError.notFound('Business not found');
   }
 
-  Object.assign(business, data, { updatedBy: userId });
+  if (data.settings) {
+    business.settings = {
+      ...(business.settings?.toObject ? business.settings.toObject() : business.settings || {}),
+      ...data.settings,
+      features: {
+        ...(business.settings?.features?.toObject ? business.settings.features.toObject() : business.settings?.features || {}),
+        ...(data.settings.features || {}),
+      },
+    };
+  }
+
+  const payload = { ...data };
+  delete payload.settings;
+  Object.assign(business, payload, { updatedBy: userId });
   await business.save();
   return business;
 }

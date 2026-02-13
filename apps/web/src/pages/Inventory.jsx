@@ -64,7 +64,7 @@ export default function Inventory() {
   const isMobile = useMediaQuery('(max-width: 48em)');
 
   const mcForm = useForm({
-    initialValues: { name: '', code: '', type: 'factory', isDefault: false },
+    initialValues: { name: '', code: '', type: 'factory', isDefault: false, autoInvoicePrintEnabled: false, invoicePrintEmail: '' },
   });
 
   useEffect(() => { loadAll(); }, []);
@@ -111,13 +111,20 @@ export default function Inventory() {
   // --- Material Centres ---
   function openMcCreate() {
     setEditingId(null);
-    mcForm.setValues({ name: '', code: '', type: 'factory', isDefault: false });
+    mcForm.setValues({ name: '', code: '', type: 'factory', isDefault: false, autoInvoicePrintEnabled: false, invoicePrintEmail: '' });
     setError('');
     setModalType('mc');
   }
   function openMcEdit(mc) {
     setEditingId(mc._id);
-    mcForm.setValues({ name: mc.name, code: mc.code, type: mc.type, isDefault: mc.isDefault || false });
+    mcForm.setValues({
+      name: mc.name,
+      code: mc.code,
+      type: mc.type,
+      isDefault: mc.isDefault || false,
+      autoInvoicePrintEnabled: mc.autoInvoicePrintEnabled || false,
+      invoicePrintEmail: mc.invoicePrintEmail || '',
+    });
     setError('');
     setModalType('mc');
   }
@@ -161,6 +168,7 @@ export default function Inventory() {
     { key: 'name', label: 'Name', render: (r) => r.name },
     { key: 'type', label: 'Type', render: (r) => <Badge variant="light" size="sm">{r.type}</Badge> },
     { key: 'isDefault', label: 'Default', render: (r) => r.isDefault ? <Badge color="green" size="sm">Yes</Badge> : null },
+    { key: 'print', label: 'Invoice Mail', render: (r) => r.autoInvoicePrintEnabled ? (r.invoicePrintEmail || '-') : '-', style: { fontFamily: 'monospace' } },
     {
       key: 'actions', label: '',
       render: (r) => (
@@ -269,7 +277,9 @@ export default function Inventory() {
                     <Group gap={6} mt={4}>
                       <Badge variant="light" size="xs">{r.type}</Badge>
                       {r.isDefault && <Badge color="green" size="xs">Default</Badge>}
+                      {r.autoInvoicePrintEnabled && <Badge color="teal" size="xs">Auto Print</Badge>}
                     </Group>
+                    {r.invoicePrintEmail && <Text size="xs" c="dimmed" ff="monospace" mt={2}>{r.invoicePrintEmail}</Text>}
                   </div>
                   <Group gap={4}>
                     {canWriteInv && <ActionIcon variant="subtle" onClick={() => openMcEdit(r)}><IconPencil size={16} /></ActionIcon>}
@@ -302,6 +312,13 @@ export default function Inventory() {
               }}
             />
             <Switch label="Default Centre" {...mcForm.getInputProps('isDefault', { type: 'checkbox' })} />
+            <Switch label="Enable Invoice Auto Print" {...mcForm.getInputProps('autoInvoicePrintEnabled', { type: 'checkbox' })} />
+            <TextInput
+              label="Invoice Print Email"
+              placeholder="godown-printer@yourdomain.com"
+              disabled={!mcForm.values.autoInvoicePrintEnabled}
+              {...mcForm.getInputProps('invoicePrintEmail')}
+            />
             <Group justify="flex-end">
               <Button variant="default" onClick={() => setModalType(null)}>Cancel</Button>
               <Button type="submit" loading={saving}>{editingId ? 'Update' : 'Save'}</Button>

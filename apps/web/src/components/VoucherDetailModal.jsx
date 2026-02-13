@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Modal, Stack, SimpleGrid, Text, Badge, Table, Group, Button, Textarea } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
+import { IconDownload, IconShare } from '@tabler/icons-react';
 import api from '../services/api.js';
 import { usePermission } from '../hooks/usePermission.js';
 
@@ -28,6 +29,7 @@ export default function VoucherDetailModal({ voucher, onClose, onUpdate }) {
   const [cancelReason, setCancelReason] = useState('');
   const [converting, setConverting] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const isMobile = useMediaQuery('(max-width: 48em)');
 
   // Voucher-type-specific permissions
@@ -76,6 +78,63 @@ export default function VoucherDetailModal({ voucher, onClose, onUpdate }) {
       notifications.show({ title: 'Conversion failed', message: err.response?.data?.message, color: 'red' });
     } finally {
       setConverting(false);
+    }
+  }
+
+  async function fetchInvoicePdf() {
+    const res = await api.get(`/vouchers/${voucher._id}/invoice-pdf`, { responseType: 'blob' });
+    return new Blob([res.data], { type: 'application/pdf' });
+  }
+
+  function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  async function handlePreviewPdf() {
+    try {
+      const blob = await fetchInvoicePdf();
+      const url = URL.createObjectURL(blob);
+      const win = window.open(url, '_blank', 'noopener,noreferrer');
+      if (!win) {
+        downloadBlob(blob, `${voucher.voucherNumber || 'invoice'}.pdf`);
+      } else {
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      }
+    } catch (err) {
+      notifications.show({ title: 'Preview failed', message: err.response?.data?.message || err.message, color: 'red' });
+    }
+  }
+
+  async function handleSharePdf() {
+    setSharing(true);
+    try {
+      const blob = await fetchInvoicePdf();
+      const filename = `${voucher.voucherNumber || 'invoice'}.pdf`;
+      const file = new File([blob], filename, { type: 'application/pdf' });
+
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({
+          title: `Invoice ${voucher.voucherNumber || ''}`.trim(),
+          text: 'Sales invoice PDF',
+          files: [file],
+        });
+      } else {
+        downloadBlob(blob, filename);
+        notifications.show({ title: 'Downloaded', message: 'Share is not available on this device/browser.', color: 'blue' });
+      }
+    } catch (err) {
+      if (err?.name !== 'AbortError') {
+        notifications.show({ title: 'Share failed', message: err.response?.data?.message || err.message, color: 'red' });
+      }
+    } finally {
+      setSharing(false);
     }
   }
 
@@ -164,6 +223,16 @@ export default function VoucherDetailModal({ voucher, onClose, onUpdate }) {
             )}
 
             <Group justify="flex-end">
+              {voucher.voucherType === 'sales_invoice' && (
+                <>
+                  <Button variant="default" leftSection={<IconDownload size={16} />} onClick={handlePreviewPdf}>
+                    Preview PDF
+                  </Button>
+                  <Button variant="light" leftSection={<IconShare size={16} />} onClick={handleSharePdf} loading={sharing}>
+                    Share PDF
+                  </Button>
+                </>
+              )}
               {voucher.status === 'posted' && canWriteType && (
                 <Button variant="light" onClick={() => { navigate(`/vouchers/${voucher._id}/edit`); onClose(); }}>
                   Edit

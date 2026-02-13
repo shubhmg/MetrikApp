@@ -21,6 +21,9 @@ const businessSchema = new mongoose.Schema({
     financialYearStart: { type: Number, default: 4 }, // April
     currency: { type: String, default: 'INR' },
     dateFormat: { type: String, default: 'DD/MM/YYYY' },
+    features: {
+      invoiceEmailPrintEnabled: { type: Boolean, default: false },
+    },
   },
   isActive: { type: Boolean, default: true },
 });

@@ -4,6 +4,7 @@ import * as voucherEngine from '../../engines/voucher.engine.js';
 import ApiError from '../../utils/ApiError.js';
 import { ROLES, VOUCHER_STATUS } from '../../config/constants.js';
 import { VOUCHER_TYPE_MODULE_MAP } from '../../config/permissions.js';
+import { scheduleInvoiceAutoPrint } from './invoicePrint.service.js';
 
 export async function createVoucher(data, businessId, userId) {
   return voucherEngine.create(data, businessId, userId);
@@ -200,6 +201,7 @@ export async function convertOrderToInvoice(orderId, businessId, userId) {
   };
 
   const invoice = await voucherEngine.create(invoiceData, businessId, userId);
+  scheduleInvoiceAutoPrint(invoice._id, businessId, userId);
 
   // Mark source order as converted so it no longer appears in active order workflows.
   order.status = VOUCHER_STATUS.CANCELLED;
