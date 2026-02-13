@@ -22,10 +22,12 @@ export default function errorHandler(err, req, res, _next) {
 
   // Mongoose duplicate key
   if (err.code === 11000) {
-    const field = Object.keys(err.keyPattern)[0];
+    const fields = Object.keys(err.keyPattern || {});
+    const field = fields.length > 0 ? fields.join(', ') : 'unique field';
     return res.status(409).json({
       success: false,
       message: `Duplicate value for ${field}`,
+      ...(err.keyValue ? { details: err.keyValue } : {}),
     });
   }
 

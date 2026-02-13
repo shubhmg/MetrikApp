@@ -47,6 +47,12 @@ function getLinkedAccountGroup(partyTypes) {
   return 'Sundry Debtors';
 }
 
+function generateLinkedAccountCode() {
+  const ts = Date.now().toString(36).toUpperCase();
+  const rnd = Math.random().toString(36).slice(2, 6).toUpperCase();
+  return `PTY-${ts}-${rnd}`.slice(0, 50);
+}
+
 export async function createParty(data, businessId, userId) {
   await dropLegacyBusinessUniqueIndexes();
 
@@ -68,6 +74,7 @@ export async function createParty(data, businessId, userId) {
 
   const linkedAccount = await Account.create({
     name: data.name,
+    code: generateLinkedAccountCode(),
     type: accountType,
     group: accountGroup,
     isSystemAccount: false,
