@@ -1,9 +1,9 @@
-const CACHE_VERSION = 'metrik-v1';
+const CACHE_VERSION = 'metrik-v2';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 const FONT_CACHE = `${CACHE_VERSION}-fonts`;
 const IMAGE_CACHE = `${CACHE_VERSION}-images`;
-const APP_SHELL = ['/', '/index.html', '/manifest.json', '/favicon.svg'];
+const APP_SHELL = ['/', '/index.html'];
 
 self.addEventListener('install', (event) => {
     event.waitUntil(
@@ -65,6 +65,26 @@ self.addEventListener('fetch', (event) => {
                     if (cached) return cached;
                     return caches.match('/index.html');
                 })
+        );
+        return;
+    }
+
+    // Always refresh PWA metadata/icon resources from network first.
+    if (
+        url.pathname === '/manifest.json' ||
+        url.pathname === '/favicon.svg' ||
+        url.pathname.startsWith('/icons/')
+    ) {
+        event.respondWith(
+            fetch(request)
+                .then((response) => {
+                    if (response && response.status === 200) {
+                        const copy = response.clone();
+                        caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, copy));
+                    }
+                    return response;
+                })
+                .catch(() => caches.match(request).then((cached) => cached || new Response('Offline', { status: 503 })))
         );
         return;
     }
