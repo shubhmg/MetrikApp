@@ -5,6 +5,32 @@ import User from '../auth/user.model.js';
 import ApiError from '../../utils/ApiError.js';
 import { PARTY_TYPES, ROLES } from '../../config/constants.js';
 
+let legacyIndexCheckDone = false;
+
+async function dropLegacyBusinessUniqueIndexes() {
+  if (legacyIndexCheckDone) return;
+  legacyIndexCheckDone = true;
+
+  const targets = [Party, Account];
+  for (const model of targets) {
+    try {
+      const indexes = await model.collection.indexes();
+      const legacyIndexes = indexes.filter((idx) => (
+        idx.unique === true &&
+        idx.key &&
+        Object.keys(idx.key).length === 1 &&
+        Object.prototype.hasOwnProperty.call(idx.key, 'businessId')
+      ));
+
+      for (const idx of legacyIndexes) {
+        await model.collection.dropIndex(idx.name);
+      }
+    } catch {
+      // Ignore index read/drop failures and continue normal request flow.
+    }
+  }
+}
+
 /**
  * Determines the account type for a party's linked account.
  * Customers → asset (receivable), Vendors → liability (payable), Mixed → asset
@@ -22,6 +48,8 @@ function getLinkedAccountGroup(partyTypes) {
 }
 
 export async function createParty(data, businessId, userId) {
+  await dropLegacyBusinessUniqueIndexes();
+
   // Check if contractor settings are being enabled for a non-contractor party
   if (data.contractorSettings?.isEnabled && !data.type?.includes(PARTY_TYPES.CONTRACTOR)) {
     throw ApiError.badRequest('Contractor settings can be set only for contractor party type');
@@ -52,13 +80,23 @@ export async function createParty(data, businessId, userId) {
     updatedBy: userId,
   });
 
-  const party = await Party.create({
-    ...data,
-    linkedAccountId: linkedAccount._id,
-    businessId,
-    createdBy: userId,
-    updatedBy: userId,
-  });
+  let party;
+  try {
+    party = await Party.create({
+      ...data,
+      linkedAccountId: linkedAccount._id,
+      businessId,
+      createdBy: userId,
+      updatedBy: userId,
+    });
+  } catch (err) {
+    // Prevent orphan linked accounts if party insert fails.
+    await Account.deleteOne({ _id: linkedAccount._id }).catch(() => {});
+    if (err?.code === 11000 && err?.keyPattern?.businessId) {
+      throw ApiError.conflict('Legacy unique index on businessId is blocking party creation. Please retry once after server restart.');
+    }
+    throw err;
+  }
 
   // Back-link account to party
   linkedAccount.linkedPartyId = party._id;
